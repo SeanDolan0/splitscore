@@ -116,3 +116,12 @@ async def test_separation_hf_error_includes_setup_hint(tmp_path):
         last = job.events.get_nowait()
     assert last["type"] == "failed"
     assert "hf auth login" in last["message"]
+
+
+def test_frontend_marks_stem_checkboxes(tmp_path, monkeypatch):
+    client = _make_client(tmp_path, monkeypatch)
+    r = client.get("/")
+    html = r.text
+    for stem in ["vocals", "piano", "guitar", "bass", "drums", "other"]:
+        assert f'data-stem="{stem}"' in html
+    assert "audio-midi-app" in html

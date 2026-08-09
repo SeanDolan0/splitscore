@@ -1,3 +1,58 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><title>AudioToMIDI</title></head>
-<body><div id="audio-midi-app">AudioToMIDI</div></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AudioToMIDI</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div id="audio-midi-app" class="shell">
+    <header class="topbar">
+      <h1>AudioToMIDI</h1>
+      <p class="tagline">separate → transcribe → MIDI</p>
+    </header>
+
+    <section id="drop-zone" class="panel dropzone" tabindex="0" role="button"
+             aria-label="Upload audio file">
+      <input type="file" id="file-input" accept=".wav,.mp3,.flac,.ogg,.m4a,.aiff" hidden>
+      <p class="drop-hint">Drag &amp; drop an audio file</p>
+      <p class="drop-sub">or click to browse (wav, mp3, flac, ogg, m4a, aiff)</p>
+    </section>
+
+    <section id="job-panel" class="panel hidden">
+      <div class="job-row">
+        <span id="job-status" class="job-status">created</span>
+        <button id="btn-cancel" class="ghost" type="button">cancel</button>
+      </div>
+      <div class="progress"><div id="progress-bar" class="progress-bar"></div></div>
+      <p id="progress-text" class="muted"></p>
+      <p id="job-error" class="error hidden"></p>
+    </section>
+
+    <section id="stem-panel" class="panel hidden">
+      <h2>Stems</h2>
+      <div id="stem-grid" class="stem-grid">
+        <label class="stem-card"><input type="checkbox" data-stem="bass" checked><span class="stem-name">bass</span><audio controls preload="none"></audio><input class="inst" data-instrument data-stem="bass" placeholder="instrument (auto)"></label>
+        <label class="stem-card"><input type="checkbox" data-stem="drums"><span class="stem-name">drums</span><audio controls preload="none"></audio><input class="inst" data-instrument data-stem="drums" placeholder="instrument (auto)"></label>
+        <label class="stem-card"><input type="checkbox" data-stem="other"><span class="stem-name">other</span><audio controls preload="none"></audio><input class="inst" data-instrument data-stem="other" placeholder="instrument (auto)"></label>
+        <label class="stem-card"><input type="checkbox" data-stem="vocals" checked><span class="stem-name">vocals</span><audio controls preload="none"></audio><input class="inst" data-instrument data-stem="vocals" placeholder="instrument (auto)"></label>
+        <label class="stem-card"><input type="checkbox" data-stem="guitar" checked><span class="stem-name">guitar</span><audio controls preload="none"></audio><input class="inst" data-instrument data-stem="guitar" placeholder="instrument (auto)"></label>
+        <label class="stem-card"><input type="checkbox" data-stem="piano" checked><span class="stem-name">piano</span><audio controls preload="none"></audio><input class="inst" data-instrument data-stem="piano" placeholder="instrument (auto)"></label>
+      </div>
+      <div class="actions">
+        <button id="btn-transcribe" class="primary" type="button">Transcribe selected to MIDI</button>
+      </div>
+      <div id="results" class="results"></div>
+    </section>
+
+    <aside class="panel settings">
+      <h2>Settings</h2>
+      <div id="settings-form" class="settings-form"></div>
+      <button id="btn-save-settings" class="ghost" type="button">Save settings</button>
+      <p id="settings-note" class="muted"></p>
+    </aside>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>
