@@ -78,6 +78,25 @@ async def test_cancelled_separation_sets_cancelled(tmp_path):
     assert _drain(job.events)[-1] == {"type": "cancelled"}
 
 
+async def test_cancel_during_separation_is_observed(tmp_path):
+    job = Job(id="j1", song_name="s", input_path=tmp_path / "in.wav",
+              output_dir=tmp_path / "out")
+
+    class CancelMidway(FakeSeparator):
+        def separate(self, in_path, out_dir, on_progress=None):
+            on_progress(10)
+            job.cancel.set()  # user cancels mid-run
+            on_progress(50)
+            on_progress(100)
+
+    pipe = Pipeline(Settings(), separator_factory=CancelMidway)
+    await pipe.separate(job)
+    assert job.status == "cancelled"
+    events = _drain(job.events)
+    assert events[-1] == {"type": "cancelled"}
+    assert not any(e["type"] == "stems" for e in events)
+
+
 async def test_separation_failure_sets_failed_with_error(tmp_path):
     class Boom:
         def __init__(self, precision="fp16", device="auto", session_factory=None):

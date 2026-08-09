@@ -78,6 +78,10 @@ class Pipeline:
                 await asyncio.to_thread(
                     sep.separate, str(job.input_path), job.output_dir / "stems",
                     lambda pct: emit({"type": "progress", "phase": "separating", "pct": pct}))
+                if job.cancel.is_set():
+                    job.status = STATUS_CANCELLED
+                    self._emit(job, {"type": "cancelled"})
+                    return
                 job.status = STATUS_READY
                 emit({"type": "stems", "stems": STEMS})
             except asyncio.CancelledError:
