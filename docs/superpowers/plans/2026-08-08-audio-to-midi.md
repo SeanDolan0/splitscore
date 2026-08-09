@@ -74,7 +74,7 @@ audioToMidi/
 name = "audio-to-midi"
 version = "0.1.0"
 description = "Separate audio into stems with BS-RoFormer-SW, then transcribe to MIDI with MuScriptor"
-requires-python = ">=3.13"
+requires-python = ">=3.13,<3.14"   # verified on 3.13.14; <3.14 keeps uv on the tested interpreter
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
@@ -95,6 +95,15 @@ dev = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+# Resolve only for the platforms the cu128 torch source targets. Without this,
+# uv also resolves for macOS where muscriptor 0.3.0 pins torch<2.3 and the whole
+# resolution fails ("This project requires torch>=2.7" on macOS x86_64).
+[tool.uv]
+environments = [
+    "sys_platform == 'win32'",
+    "sys_platform == 'linux'",
+]
 
 # Pin torch to the CUDA 12.8 wheel index on Linux/Windows (macOS has no CUDA wheels).
 [[tool.uv.index]]
@@ -154,9 +163,13 @@ Expected: `no tests ran` (exit code 5) or `collected 0 items`. If it errors on c
 - [ ] **Step 7: Commit**
 
 ```bash
-git add pyproject.toml .gitignore app/__init__.py
+git add pyproject.toml uv.lock .gitignore app/__init__.py
 git commit -m "chore: scaffold uv project with cu128 torch + core deps"
 ```
+
+> Note: `uv.lock` is committed — it pins the resolved cu128 torch build and all transitive deps (uv-idiomatic reproducibility). On this machine all uv commands need `--system-certs` (TLS-interception proxy) — e.g. `uv sync --system-certs`.
+
+**Step 5 verification re: `--system-certs`:** the TLS-interception proxy on this machine breaks uv's default cert bundle. Run uv commands as `uv --system-certs <subcommand>` (or `uv sync --system-certs`) throughout this project.
 
 ---
 
