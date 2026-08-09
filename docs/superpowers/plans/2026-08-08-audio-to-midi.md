@@ -1131,6 +1131,7 @@ git commit -m "feat: add job pipeline with SSE events and cancellation"
 **Files:**
 - Create: `app/main.py`
 - Create: `app/__main__.py`
+- Create: `app/static/index.html` (stub — the full page replaces it in Task 8; the `StaticFiles` mount at `app/static/` raises `RuntimeError: Directory ... does not exist` at import if the dir is absent, so a stub must exist before the Task 7 tests run)
 - Test: `tests/test_main.py`
 
 **Interfaces:**
@@ -1238,7 +1239,17 @@ def test_index_html_served(tmp_path, monkeypatch):
 Run: `uv run pytest tests/test_main.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'app.main'`.
 
-- [ ] **Step 3: Write minimal implementation — `app/main.py`**
+- [ ] **Step 3: Create the stub `app/static/index.html`**
+
+```html
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>AudioToMIDI</title></head>
+<body><div id="audio-midi-app">AudioToMIDI</div></body></html>
+```
+
+> Note: this stub is required so `app.main` imports (its `StaticFiles` mount needs `app/static/` to exist). Task 8 overwrites it with the full page.
+
+- [ ] **Step 4: Write minimal implementation — `app/main.py`**
 
 ```python
 """FastAPI backend: routes, SSE event stream, static frontend."""
@@ -1393,15 +1404,15 @@ if __name__ == "__main__":
     main()
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] **Step 5: Run test to verify it passes**
 
 Run: `uv run pytest tests/test_main.py -v`
 Expected: PASS (6 passed). Uses `FakePipeline`, so no real separation, no model downloads, no HF token.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add app/main.py app/__main__.py tests/test_main.py
+git add app/main.py app/__main__.py app/static/index.html tests/test_main.py
 git commit -m "feat: add FastAPI backend with SSE progress and job routes"
 ```
 
