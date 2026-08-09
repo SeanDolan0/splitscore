@@ -464,6 +464,7 @@ def overlap_add(chunks: list[torch.Tensor], total_frames: int) -> torch.Tensor:
         raise ValueError("no chunks to overlap-add")
     out = chunks[0][..., :total_frames].clone()
     for i in range(1, len(chunks)):
+        chunk = chunks[i]
         start = i * CHUNK_HOP_FRAMES
         if start >= total_frames:
             break
