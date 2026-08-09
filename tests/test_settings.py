@@ -1,10 +1,3 @@
-import sys
-from pathlib import Path
-
-# The `pytest` console script does not place the project root on sys.path,
-# so bootstrap it here to make `uv run pytest` resolve `app`.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from app.settings import Settings, STEMS, DEFAULT_SETTINGS, load_settings, save_settings, resolve_device
 
 def test_stems_order():

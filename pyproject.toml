@@ -23,6 +23,7 @@ dev = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+pythonpath = ["."]
 
 # Resolve only for the platforms the cu128 torch source targets. Without this,
 # uv also resolves for macOS where muscriptor 0.3.0 pins torch<2.3 and the whole
