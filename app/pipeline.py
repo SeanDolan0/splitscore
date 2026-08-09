@@ -32,6 +32,14 @@ class Job:
     events: asyncio.Queue = field(default_factory=asyncio.Queue)
 
 
+def _hf_setup_hint(exc: Exception) -> str:
+    """Append a setup hint when the error looks like a missing/rejected HF token."""
+    text = str(exc).lower()
+    if any(s in text for s in ("401", "gated", "authentication", "forbidden", "hf_token", "huggingface")):
+        return f"{exc}\n\nSetup hint: run `uv run hf auth login` with a Hugging Face token to download the models."
+    return str(exc)
+
+
 class Pipeline:
     def __init__(self, settings: Settings, separator_factory=None, transcriber_factory=None):
         self.settings = settings
@@ -88,9 +96,10 @@ class Pipeline:
                 job.status = STATUS_CANCELLED
                 self._emit(job, {"type": "cancelled"})
             except Exception as exc:
+                msg = _hf_setup_hint(exc)
                 job.status = STATUS_FAILED
-                job.error = str(exc)
-                self._emit(job, {"type": "failed", "message": str(exc)})
+                job.error = msg
+                self._emit(job, {"type": "failed", "message": msg})
 
     async def transcribe(self, job: Job, stems: list[str], instrument_by_stem: dict[str, str],
                          temperature: float, beam_size: int, batch_size: int) -> None:
@@ -118,9 +127,10 @@ class Pipeline:
                         # One stem failing must not stop the others (non-terminal).
                         self._emit(job, {"type": "error", "message": f"{stem}: {exc}"})
             except Exception as exc:
+                msg = _hf_setup_hint(exc)
                 job.status = STATUS_FAILED
-                job.error = str(exc)
-                self._emit(job, {"type": "failed", "message": str(exc)})
+                job.error = msg
+                self._emit(job, {"type": "failed", "message": msg})
                 return
         if job.cancel.is_set():
             job.status = STATUS_CANCELLED

@@ -78,3 +78,41 @@ def test_index_html_served(tmp_path, monkeypatch):
     r = client.get("/")
     assert r.status_code == 200
     assert "audio-midi-app" in r.text
+
+def test_download_midi_rejects_path_traversal(tmp_path, monkeypatch):
+    client = _make_client(tmp_path, monkeypatch)
+    # A real file outside the output base that an unchecked traversal would serve.
+    outside = tmp_path.parent / "midi" / "secret.txt"
+    outside.parent.mkdir(parents=True, exist_ok=True)
+    outside.write_text("secret")
+    r = client.get("/output/%2e%2e/midi/secret.txt")
+    assert r.status_code == 404
+
+def test_upload_stores_traversal_filename_inside_job_dir(tmp_path, monkeypatch):
+    client = _make_client(tmp_path, monkeypatch)
+    r = client.post("/api/jobs", files={"file": ("..\\evil.wav", b"x", "audio/wav")})
+    assert r.status_code == 200
+    assert (tmp_path / "abc" / "input" / "evil.wav").is_file()
+    assert not (tmp_path / "abc" / "evil.wav").exists()
+
+async def test_separation_hf_error_includes_setup_hint(tmp_path):
+    from app.pipeline import Pipeline, Job
+    from app.settings import Settings
+
+    class GatedSeparator:
+        def __init__(self, precision="fp16", device="auto", session_factory=None):
+            pass
+        def separate(self, in_path, out_dir, on_progress=None):
+            raise Exception("gated repo elicwhite/bs-roformer-sw-6stem-onnx is gated")
+
+    job = Job(id="j1", song_name="s", input_path=tmp_path / "in.wav",
+              output_dir=tmp_path / "out")
+    pipe = Pipeline(Settings(), separator_factory=GatedSeparator)
+    await pipe.separate(job)
+    assert job.status == "failed"
+    assert "hf auth login" in job.error
+    last = None
+    while not job.events.empty():
+        last = job.events.get_nowait()
+    assert last["type"] == "failed"
+    assert "hf auth login" in last["message"]

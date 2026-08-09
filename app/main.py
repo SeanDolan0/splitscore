@@ -33,7 +33,11 @@ class TranscribeBody(BaseModel):
 
 @app.post("/api/jobs")
 async def create_job(file: UploadFile = File(...)):
-    name = file.filename or ""
+    name = Path(file.filename or "").name  # basename only, strips any ../ or drive segments
+    if not name:
+        raise HTTPException(400, "Invalid filename")
+    if "/" in name or "\\" in name:
+        raise HTTPException(400, "Invalid filename")
     ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(400, f"Unsupported extension '.{ext}'; allowed: {sorted(ALLOWED_EXTENSIONS)}")
@@ -117,16 +121,18 @@ async def put_settings(body: dict):
 
 @app.get("/output/{job_id}/midi/{filename}")
 async def download_midi(job_id: str, filename: str):
-    path = Path(PIPELINE.settings.output_folder) / job_id / "midi" / filename
-    if not path.is_file():
+    base = Path(PIPELINE.settings.output_folder).resolve()
+    path = (base / job_id / "midi" / filename).resolve()
+    if not path.is_relative_to(base) or not path.is_file():
         raise HTTPException(404, "MIDI not found")
     return FileResponse(path, media_type="audio/midi", filename=filename)
 
 
 @app.get("/output/{job_id}/stems/{filename}")
 async def download_stem(job_id: str, filename: str):
-    path = Path(PIPELINE.settings.output_folder) / job_id / "stems" / filename
-    if not path.is_file():
+    base = Path(PIPELINE.settings.output_folder).resolve()
+    path = (base / job_id / "stems" / filename).resolve()
+    if not path.is_relative_to(base) or not path.is_file():
         raise HTTPException(404, "Stem not found")
     return FileResponse(path, media_type="audio/wav")
 
