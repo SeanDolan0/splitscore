@@ -115,7 +115,9 @@ async def get_settings():
 async def put_settings(body: dict):
     merged = asdict(load_settings())
     merged.update({k: v for k, v in body.items() if k in merged})
-    save_settings(Settings(**merged))
+    updated = Settings(**merged)
+    save_settings(updated)
+    PIPELINE.settings = updated
     return merged
 
 

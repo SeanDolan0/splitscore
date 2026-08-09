@@ -125,3 +125,9 @@ def test_frontend_marks_stem_checkboxes(tmp_path, monkeypatch):
     for stem in ["vocals", "piano", "guitar", "bass", "drums", "other"]:
         assert f'data-stem="{stem}"' in html
     assert "audio-midi-app" in html
+
+def test_put_settings_applies_to_running_pipeline(tmp_path, monkeypatch):
+    client = _make_client(tmp_path, monkeypatch)
+    r = client.put("/api/settings", json={"model_size": "small"})
+    assert r.status_code == 200
+    assert main.PIPELINE.settings.model_size == "small"

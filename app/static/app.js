@@ -50,6 +50,7 @@ async function saveSettings() {
   ["keep_stems", "remember_selection"].forEach((key) => {
     body[key] = $(`s-${key}`).checked;
   });
+  body.instrument_by_stem = settings.instrument_by_stem || {};
   const resp = await fetch("/api/settings", {
     method: "PUT", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body),
   });
@@ -136,6 +137,7 @@ async function transcribeSelected() {
     settings.instrument_by_stem[el.dataset.stem] = el.value.trim();
   });
   if (settings.remember_selection) localStorage.setItem("checkedStems", JSON.stringify(stems));
+  await saveSettings();
   await fetch(`/api/jobs/${currentJob}/transcribe`, {
     method: "POST", headers: {"Content-Type": "application/json"},
     body: JSON.stringify({ stems }),
