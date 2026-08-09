@@ -82,3 +82,93 @@ def mask_and_synthesize(input_spec: torch.Tensor, mask: torch.Tensor,
                         length: int | None = None) -> torch.Tensor:
     """Apply a per-stem mask [2,1025,F] to input_spec, ISTFT back to audio [2,N]."""
     return istft(input_spec * mask, length=length)
+
+
+from pathlib import Path
+
+import numpy as np
+import onnxruntime as ort
+import soundfile as sf
+
+
+MODEL_ID = "elicwhite/bs-roformer-sw-6stem-onnx"
+MODEL_FILES = {"fp16": "bs_roformer_sw_6stem_fp16.onnx", "fp32": "bs_roformer_sw_6stem_fp32.onnx"}
+MODEL_CACHE = Path.home() / ".cache" / "audio-to-midi" / "separator"
+
+
+def load_audio(path: str | Path) -> tuple[torch.Tensor, int]:
+    """Decode any soundfile-readable file to stereo float32 @ 44.1 kHz."""
+    data, sr = sf.read(str(path), always_2d=True, dtype="float32")  # [N, ch]
+    if data.shape[1] == 1:
+        data = np.repeat(data, 2, axis=1)
+    elif data.shape[1] > 2:
+        data = data[:, :2]
+    audio = torch.from_numpy(data.T).float()  # [ch, N]
+    if sr != SR:
+        target = int(audio.shape[1] * SR / sr)
+        audio = torch.stack([
+            torch.nn.functional.interpolate(
+                audio[c:c+1, None, :], size=target, mode="linear", align_corners=False)[0, 0]
+            for c in range(2)])
+    return audio, SR
+
+
+def _download_model(precision: str) -> Path:
+    """Download the ONNX file to MODEL_CACHE if missing; return its path."""
+    from huggingface_hub import hf_hub_download
+    MODEL_CACHE.mkdir(parents=True, exist_ok=True)
+    return Path(hf_hub_download(
+        repo_id=MODEL_ID, filename=MODEL_FILES[precision], cache_dir=MODEL_CACHE))
+
+
+def _default_session_factory(precision: str, device: str) -> ort.InferenceSession:
+    model_path = _download_model(precision)
+    providers = (["CUDAExecutionProvider", "CPUExecutionProvider"]
+                 if device == "cuda" else ["CPUExecutionProvider"])
+    return ort.InferenceSession(str(model_path), providers=providers)
+
+
+class Separator:
+    def __init__(self, precision: str = "fp16", device: str = "auto", session_factory=None):
+        self.precision = precision if precision in MODEL_FILES else "fp16"
+        from app.settings import resolve_device
+        self.device = resolve_device(device)
+        factory = session_factory or _default_session_factory
+        try:
+            self.session = factory(self.precision, self.device)
+        except Exception:
+            # GPU runtime failed (missing provider, download hiccup) -> CPU.
+            self.session = _default_session_factory(self.precision, "cpu")
+            self.device = "cpu"
+
+    def _run_chunk(self, spec_chunk: torch.Tensor):
+        """[2,1025,345] complex -> ([6,2,1025,345] real, [6,2,1025,345] imag) as tensors."""
+        r = spec_chunk[None, ...].real.float().numpy()
+        i = spec_chunk[None, ...].imag.float().numpy()
+        out_r, out_i = self.session.run(None, {"spec_real": r, "spec_imag": i})
+        return torch.from_numpy(out_r), torch.from_numpy(out_i)
+
+    def separate(self, in_path, out_dir, on_progress=None) -> list[Path]:
+        audio, _ = load_audio(in_path)
+        spec = stft(audio.to("cpu"))
+        chunks = split_into_chunks(spec)
+        out_dir = Path(out_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        acc = [None] * len(STEMS)  # per-stem masked chunk lists
+        for idx, chunk in enumerate(chunks):
+            masks_r, masks_i = self._run_chunk(chunk)
+            for s in range(len(STEMS)):
+                mask = masks_r[0, s] + 1j * masks_i[0, s]  # [2,1025,345]
+                masked = chunk * mask
+                acc[s] = acc[s] or []
+                acc[s].append(masked)
+            if on_progress:
+                on_progress(100.0 * (idx + 1) / len(chunks))
+        results = []
+        for s, name in enumerate(STEMS):
+            recon = overlap_add(acc[s], spec.shape[-1])
+            audio_s = istft(recon, length=audio.shape[1]).clamp(-1.0, 1.0)
+            path = out_dir / f"{name}.wav"
+            sf.write(str(path), audio_s.T.numpy(), SR)
+            results.append(path)
+        return results
