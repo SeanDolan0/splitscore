@@ -131,3 +131,29 @@ def test_separate_uses_fake_session_precision_and_device(tmp_path):
     sep = Separator(precision="fp32", device="cpu", session_factory=factory)
     sep.separate(src, tmp_path / "out")
     assert seen == {"precision": "fp32", "device": "cpu"}
+
+
+class ChannelDistinctFakeSession:
+    """Distinct real mask per output channel: channel s scales input by (1 + 0.1*s)."""
+    def __init__(self, precision, device):
+        self.precision = precision
+        self.device = device
+    def run(self, output_names, feeds):
+        r = feeds["spec_real"]  # [1,2,1025,345]
+        i = feeds["spec_imag"]
+        zeros = np.zeros_like(i)
+        out_r = np.stack([np.ones_like(r) * (1.0 + 0.1 * s) for s in range(6)], axis=1)
+        out_i = np.stack([zeros] * 6, axis=1)
+        return out_r, out_i
+
+
+def test_separate_maps_output_channels_to_stems(tmp_path):
+    src = _make_wav(tmp_path / "song.wav", seconds=3.0)
+    sep = Separator(session_factory=ChannelDistinctFakeSession)
+    results = sep.separate(src, tmp_path / "out")
+    orig, _ = sf.read(str(src))
+    for s, p in enumerate(results):
+        stem, _ = sf.read(str(p))
+        scale = 1.0 + 0.1 * s
+        rel = np.abs(stem - scale * orig).mean() / (scale * np.abs(orig).mean() + 1e-9)
+        assert rel < 0.02, f"stem {s} not from output channel {s}: rel {rel:.3f}"
