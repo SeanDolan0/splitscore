@@ -95,6 +95,7 @@ dev = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+pythonpath = ["."]   # bare `uv run pytest` (console script) does NOT add the project root to sys.path
 
 # Resolve only for the platforms the cu128 torch source targets. Without this,
 # uv also resolves for macOS where muscriptor 0.3.0 pins torch<2.3 and the whole
@@ -237,10 +238,9 @@ def test_resolve_device_auto_and_explicit(monkeypatch):
     assert resolve_device("cuda") == "cuda"
 
 class _FakeTorch:
+    """Mirror real torch: `torch.cuda` is an attribute whose .is_available() is called."""
     def __init__(self, cuda):
-        self._cuda = cuda
-    def cuda(self):
-        return _FakeCuda(self._cuda)
+        self.cuda = _FakeCuda(cuda)
 
 class _FakeCuda:
     def __init__(self, available):
