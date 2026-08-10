@@ -11,6 +11,13 @@ async function loadSettings() {
   settings = await (await fetch("/api/settings")).json();
   renderSettingsForm();
 }
+async function loadInstruments() {
+  // Populate the stem-card instrument inputs from the MuScriptor vocabulary,
+  // so users pick valid names instead of typing e.g. "vocals" (it's "voice").
+  const { instruments } = await (await fetch("/api/instruments")).json();
+  $("instrument-options").innerHTML =
+    instruments.map((n) => `<option value="${n}">`).join("");
+}
 function renderSettingsForm() {
   const fields = [
     ["separation_precision", "Separation precision", ["fp16", "fp32"]],
@@ -119,7 +126,9 @@ function showStems() {
     ? (JSON.parse(localStorage.getItem("checkedStems") || "null") || DEFAULT_CHECKED)
     : DEFAULT_CHECKED;
   STEMS.forEach((stem) => {
-    const card = document.querySelector(`.stem-card[data-stem="${stem}"]`);
+    // data-stem lives on the card's checkbox input, not on the .stem-card
+    // label; climb from the input to the card so the panel actually shows.
+    const card = document.querySelector(`input[data-stem="${stem}"]`).closest(".stem-card");
     card.querySelector('input[type="checkbox"]').checked = remembered.includes(stem);
     card.querySelector("audio").src = `/output/${currentJob}/stems/${stem}.wav`;
     card.querySelector(".inst").value = settings.instrument_by_stem?.[stem] || "";
@@ -170,4 +179,5 @@ $("btn-cancel").addEventListener("click", async () => {
 });
 $("btn-transcribe").addEventListener("click", transcribeSelected);
 loadSettings();
+loadInstruments();
 setupDropzone();
