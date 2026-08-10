@@ -32,13 +32,14 @@
 
     <section id="stem-panel" class="panel hidden">
       <h2>Stems</h2>
+      <datalist id="instrument-options"></datalist>
       <div id="stem-grid" class="stem-grid">
-        <label class="stem-card"><input type="checkbox" data-stem="bass" checked><span class="stem-name">bass</span><audio controls preload="none"></audio><input class="inst" data-instrument data-stem="bass" placeholder="instrument (auto)"></label>
-        <label class="stem-card"><input type="checkbox" data-stem="drums"><span class="stem-name">drums</span><audio controls preload="none"></audio><input class="inst" data-instrument data-stem="drums" placeholder="instrument (auto)"></label>
-        <label class="stem-card"><input type="checkbox" data-stem="other"><span class="stem-name">other</span><audio controls preload="none"></audio><input class="inst" data-instrument data-stem="other" placeholder="instrument (auto)"></label>
-        <label class="stem-card"><input type="checkbox" data-stem="vocals" checked><span class="stem-name">vocals</span><audio controls preload="none"></audio><input class="inst" data-instrument data-stem="vocals" placeholder="instrument (auto)"></label>
-        <label class="stem-card"><input type="checkbox" data-stem="guitar" checked><span class="stem-name">guitar</span><audio controls preload="none"></audio><input class="inst" data-instrument data-stem="guitar" placeholder="instrument (auto)"></label>
-        <label class="stem-card"><input type="checkbox" data-stem="piano" checked><span class="stem-name">piano</span><audio controls preload="none"></audio><input class="inst" data-instrument data-stem="piano" placeholder="instrument (auto)"></label>
+        <label class="stem-card"><input type="checkbox" data-stem="bass" checked><span class="stem-name">bass</span><audio controls preload="none"></audio><input class="inst" list="instrument-options" data-instrument data-stem="bass" placeholder="instrument (auto)"></label>
+        <label class="stem-card"><input type="checkbox" data-stem="drums"><span class="stem-name">drums</span><audio controls preload="none"></audio><input class="inst" list="instrument-options" data-instrument data-stem="drums" placeholder="instrument (auto)"></label>
+        <label class="stem-card"><input type="checkbox" data-stem="other"><span class="stem-name">other</span><audio controls preload="none"></audio><input class="inst" list="instrument-options" data-instrument data-stem="other" placeholder="instrument (auto)"></label>
+        <label class="stem-card"><input type="checkbox" data-stem="vocals" checked><span class="stem-name">vocals</span><audio controls preload="none"></audio><input class="inst" list="instrument-options" data-instrument data-stem="vocals" placeholder="instrument (auto)"></label>
+        <label class="stem-card"><input type="checkbox" data-stem="guitar" checked><span class="stem-name">guitar</span><audio controls preload="none"></audio><input class="inst" list="instrument-options" data-instrument data-stem="guitar" placeholder="instrument (auto)"></label>
+        <label class="stem-card"><input type="checkbox" data-stem="piano" checked><span class="stem-name">piano</span><audio controls preload="none"></audio><input class="inst" list="instrument-options" data-instrument data-stem="piano" placeholder="instrument (auto)"></label>
       </div>
       <div class="actions">
         <button id="btn-transcribe" class="primary" type="button">Transcribe selected to MIDI</button>

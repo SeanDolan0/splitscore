@@ -10,7 +10,7 @@ def test_defaults_match_spec():
     assert s.model_size == "large"
     assert s.temperature == 0.0
     assert s.beam_size == 4
-    assert s.batch_size == 4
+    assert s.batch_size == 1
     assert s.output_folder == "./output"
     assert s.keep_stems is True
     assert s.remember_selection is True

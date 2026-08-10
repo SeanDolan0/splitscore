@@ -14,7 +14,7 @@ class FakeTranscriber:
     def __init__(self, model_size="large", device="auto"):
         pass
     def transcribe(self, stem_path, stem, instruments=None, temperature=0.0,
-                   beam_size=4, batch_size=4) -> bytes:
+                   beam_size=4, batch_size=4, on_chunk=None) -> bytes:
         return f"midi:{stem}".encode()
 
 
@@ -110,6 +110,38 @@ async def test_separation_failure_sets_failed_with_error(tmp_path):
     assert job.status == "failed"
     assert "model weights" in job.error
     assert _drain(job.events)[-1]["type"] == "failed"
+
+
+async def test_cuda_oom_fails_job_not_stems(tmp_path):
+    class Boom(FakeTranscriber):
+        def transcribe(self, *a, **k):
+            raise RuntimeError("CUDA error: out of memory (torch.AcceleratorError)")
+    job = Job(id="j1", song_name="s", input_path=tmp_path / "in.wav",
+              output_dir=tmp_path / "out")
+    (tmp_path / "out" / "midi").mkdir(parents=True)
+    pipe = Pipeline(Settings(), transcriber_factory=Boom)
+    await pipe.transcribe(job, ["vocals", "drums"], {}, 0.0, 4, 4)
+    assert job.status == "failed"
+    assert "out of memory" in job.error.lower()
+    assert _drain(job.events)[-1]["type"] == "failed"
+
+
+async def test_transcribe_forwards_chunk_progress(tmp_path):
+    class Progressing(FakeTranscriber):
+        def transcribe(self, stem_path, stem, instruments=None, temperature=0.0,
+                       beam_size=4, batch_size=4, on_chunk=None) -> bytes:
+            for c in (0, 1, 2):
+                on_chunk(c, 2)
+            return b"ok"
+    job = Job(id="j1", song_name="s", input_path=tmp_path / "in.wav",
+              output_dir=tmp_path / "out")
+    (tmp_path / "out" / "midi").mkdir(parents=True)
+    pipe = Pipeline(Settings(), transcriber_factory=Progressing)
+    await pipe.transcribe(job, ["vocals"], {}, 0.0, 4, 4)
+    assert job.status == "done"
+    progress = [e["pct"] for e in _drain(job.events)
+                if e["type"] == "progress" and e["phase"] == "transcribing"]
+    assert progress == [0, 0, 50, 100]
 
 
 async def test_create_job_registers_and_makes_dirs(tmp_path):

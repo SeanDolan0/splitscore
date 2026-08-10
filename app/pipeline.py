@@ -40,6 +40,16 @@ def _hf_setup_hint(exc: Exception) -> str:
     return str(exc)
 
 
+def _is_cuda_oom(exc: Exception) -> bool:
+    text = f"{type(exc).__name__}: {exc}".lower()
+    return "out of memory" in text or "cuda error" in text
+
+
+_OOM_MESSAGE = (
+    "CUDA ran out of memory while transcribing. Lower Beam size or Batch size in "
+    "Settings (or pick a smaller model), then try again.")
+
+
 class Pipeline:
     def __init__(self, settings: Settings, separator_factory=None, transcriber_factory=None):
         self.settings = settings
@@ -109,6 +119,7 @@ class Pipeline:
                 tr = await asyncio.to_thread(
                     self._tr_factory, model_size=self.settings.model_size,
                     device=self.settings.transcription_device)
+                loop = asyncio.get_running_loop()
                 for stem in stems:
                     if job.cancel.is_set():
                         job.status = STATUS_CANCELLED
@@ -117,13 +128,27 @@ class Pipeline:
                     self._emit(job, {"type": "progress", "phase": "transcribing",
                                      "stem": stem, "pct": 0})
                     try:
+                        def on_chunk(completed, total, stem=stem):
+                            # Called from the worker thread -> thread-safe push.
+                            loop.call_soon_threadsafe(
+                                job.events.put_nowait,
+                                {"type": "progress", "phase": "transcribing",
+                                 "stem": stem, "pct": round(100.0 * completed / total)})
                         midi_bytes = await asyncio.to_thread(
                             tr.transcribe, job.output_dir / "stems" / f"{stem}.wav", stem,
-                            instrument_by_stem.get(stem) or None, temperature, beam_size, batch_size)
+                            instrument_by_stem.get(stem) or None, temperature, beam_size,
+                            batch_size, on_chunk)
                         out = job.output_dir / "midi" / f"{job.song_name}_{stem}.mid"
                         out.write_bytes(midi_bytes)
                         self._emit(job, {"type": "midi", "stem": stem, "file": out.name})
                     except Exception as exc:
+                        if _is_cuda_oom(exc):
+                            # VRAM exhausted at the KV-cache stage: continuing to
+                            # the next stem would OOM again, so fail the job.
+                            job.status = STATUS_FAILED
+                            job.error = _OOM_MESSAGE
+                            self._emit(job, {"type": "failed", "message": _OOM_MESSAGE})
+                            return
                         # One stem failing must not stop the others (non-terminal).
                         self._emit(job, {"type": "error", "message": f"{stem}: {exc}"})
             except Exception as exc:

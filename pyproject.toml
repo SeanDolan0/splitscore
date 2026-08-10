@@ -6,7 +6,7 @@ requires-python = ">=3.13,<3.14"   # verified on 3.13.14; <3.14 keeps uv on the 
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
-    "onnxruntime-gpu>=1.20",
+    "onnxruntime-gpu>=1.21,<1.27",  # 1.27+ is built against CUDA 13; torch here is cu128 (CUDA 12.8)
     "torch>=2.7",
     "soundfile>=0.12",
     "huggingface-hub>=0.24",

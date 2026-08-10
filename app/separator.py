@@ -114,11 +114,20 @@ def load_audio(path: str | Path) -> tuple[torch.Tensor, int]:
 
 
 def _download_model(precision: str) -> Path:
-    """Download the ONNX file to MODEL_CACHE if missing; return its path."""
+    """Return the ONNX path from MODEL_CACHE, downloading only if absent.
+
+    local_files_only first: the plain call does a Hub HEAD check on every
+    invocation, which retries ~25s (x2, the CPU fallback re-calls this) before
+    any session is created when the machine's Python TLS stack is broken.
+    """
     from huggingface_hub import hf_hub_download
     MODEL_CACHE.mkdir(parents=True, exist_ok=True)
-    return Path(hf_hub_download(
-        repo_id=MODEL_ID, filename=MODEL_FILES[precision], cache_dir=MODEL_CACHE))
+    kw = dict(repo_id=MODEL_ID, filename=MODEL_FILES[precision], cache_dir=MODEL_CACHE)
+    try:
+        return Path(hf_hub_download(**kw, local_files_only=True))
+    except Exception:
+        # Not cached yet (fresh machine) -> normal download.
+        return Path(hf_hub_download(**kw))
 
 
 def _default_session_factory(precision: str, device: str) -> ort.InferenceSession:

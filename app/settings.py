@@ -20,7 +20,7 @@ class Settings:
     instrument_by_stem: dict = field(default_factory=dict)  # stem -> instrument name or "" (auto)
     temperature: float = 0.0             # 0 = deterministic
     beam_size: int = 4                   # 1 = greedy
-    batch_size: int = 4
+    batch_size: int = 1                  # >1 disables prelude forcing & multiplies KV-cache VRAM
     transcription_device: str = "auto"   # auto | cuda | cpu
     output_folder: str = "./output"
     keep_stems: bool = True

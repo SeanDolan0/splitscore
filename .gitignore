@@ -3,3 +3,6 @@ __pycache__/
 .venv/
 output/
 .hf_cache/
+server.log
+app/settings.json
+*.flac

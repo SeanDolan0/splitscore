@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from app.pipeline import STATUS_DONE, STATUS_FAILED, STATUS_READY, Pipeline
 from app.separator import STEMS
 from app.settings import Settings, load_settings, save_settings
+from app.transcribe import list_instruments
 
 ALLOWED_EXTENSIONS = {"wav", "mp3", "flac", "ogg", "m4a", "aiff"}
 
@@ -104,6 +105,14 @@ async def events(job_id: str):
             except asyncio.TimeoutError:
                 yield _HEARTBEAT
     return StreamingResponse(gen(), media_type="text/event-stream")
+
+
+@app.get("/api/instruments")
+async def get_instruments():
+    # First call shells out to `muscriptor list-instruments` (~seconds); run it
+    # off the event loop. Result is cached in transcribe.list_instruments.
+    instruments = await asyncio.to_thread(list_instruments)
+    return {"instruments": instruments}
 
 
 @app.get("/api/settings")

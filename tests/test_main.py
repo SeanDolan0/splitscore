@@ -2,6 +2,7 @@ import asyncio
 import io
 import wave
 from pathlib import Path
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 import app.main as main
 
@@ -58,6 +59,13 @@ def test_upload_rejects_empty_file(tmp_path, monkeypatch):
     client = _make_client(tmp_path, monkeypatch)
     r = client.post("/api/jobs", files={"file": ("song.wav", b"", "audio/wav")})
     assert r.status_code == 400
+
+def test_instruments_endpoint(tmp_path, monkeypatch):
+    client = _make_client(tmp_path, monkeypatch)
+    with patch("app.main.list_instruments", return_value=["voice", "drums"]):
+        r = client.get("/api/instruments")
+        assert r.status_code == 200
+        assert r.json() == {"instruments": ["voice", "drums"]}
 
 def test_settings_roundtrip(tmp_path, monkeypatch):
     client = _make_client(tmp_path, monkeypatch)
