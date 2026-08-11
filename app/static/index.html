@@ -3,57 +3,185 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AudioToMIDI</title>
+  <meta name="color-scheme" content="dark">
+  <title>SplitScore · Separation Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
 </head>
-<body>
-  <div id="audio-midi-app" class="shell">
-    <header class="topbar">
-      <h1>AudioToMIDI</h1>
-      <p class="tagline">separate → transcribe → MIDI</p>
+<body data-console="idle">
+  <div class="grain" aria-hidden="true"></div>
+
+  <main id="audio-midi-app" class="shell">
+
+    <!-- console header band -->
+    <header class="console">
+      <span class="screw tl"></span>
+      <span class="screw tr"></span>
+      <div class="console-top">
+        <div class="brand">
+          <p class="brand-kicker mono-label">AUDIO SEPARATION &amp; TRANSCRIPTION CONSOLE · BS-ROFORMER · MUSCRIPTOR</p>
+          <h1 class="brand-name">SPLIT<span class="brand-arrow">→</span>SCORE</h1>
+        </div>
+        <div class="status-leds" aria-hidden="true">
+          <span class="led led-pwr"><i></i>PWR</span>
+          <span class="led led-busy"><i></i>BUSY</span>
+          <span class="led led-err"><i></i>ERR</span>
+        </div>
+      </div>
+      <div class="signal-path mono-label" aria-hidden="true">
+        <span class="sp on">INPUT</span><span class="sp-dash on"></span>
+        <span class="sp on">STEMS</span><span class="sp-dash"></span>
+        <span class="sp">MIDI</span>
+      </div>
+      <div class="vents" aria-hidden="true"></div>
     </header>
 
+    <!-- tape insert / drop zone -->
     <section id="drop-zone" class="panel dropzone" tabindex="0" role="button"
-             aria-label="Upload audio file">
+             aria-label="INSERT AUDIO — upload audio file">
+      <span class="screw tl"></span>
+      <span class="screw tr"></span>
       <input type="file" id="file-input" accept=".wav,.mp3,.flac,.ogg,.m4a,.aiff" hidden>
-      <p class="drop-hint">Drag &amp; drop an audio file</p>
-      <p class="drop-sub">or click to browse (wav, mp3, flac, ogg, m4a, aiff)</p>
+      <div class="vinyl" aria-hidden="true"></div>
+      <p id="drop-file" class="drop-hint">INSERT AUDIO</p>
+      <p class="drop-sub">drag &amp; drop · click to browse</p>
+      <p class="drop-formats mono-label">WAV · MP3 · FLAC · OGG · M4A · AIFF</p>
     </section>
 
-    <section id="job-panel" class="panel hidden">
+    <!-- transport / job progress -->
+    <section id="job-panel" class="panel transport hidden" data-state="idle">
+      <span class="screw tl"></span>
+      <span class="screw tr"></span>
       <div class="job-row">
-        <span id="job-status" class="job-status">created</span>
-        <button id="btn-cancel" class="ghost" type="button">cancel</button>
+        <span class="job-title mono-label">TRANSPORT</span>
+        <div class="job-state">
+          <span id="job-status" class="job-status" aria-live="polite">created</span>
+          <button id="btn-cancel" class="ghost" type="button">CANCEL</button>
+        </div>
       </div>
       <div class="progress"><div id="progress-bar" class="progress-bar"></div></div>
-      <p id="progress-text" class="muted"></p>
-      <p id="job-error" class="error hidden"></p>
+      <div class="progress-meta">
+        <p id="progress-text" class="muted"></p>
+        <span id="progress-pct" class="mono-label">0%</span>
+      </div>
+      <p id="job-error" class="error hidden" aria-live="polite"></p>
     </section>
 
+    <!-- stem outputs -->
     <section id="stem-panel" class="panel hidden">
-      <h2>Stems</h2>
-      <datalist id="instrument-options"></datalist>
+      <span class="screw tl"></span>
+      <span class="screw tr"></span>
+      <header class="rack-head">
+        <h2 class="rack-title mono-label">STEM OUTPUTS</h2>
+        <p class="rack-sub muted">check channels to transcribe · set an instrument to override the guess</p>
+      </header>
       <div id="stem-grid" class="stem-grid">
-        <label class="stem-card"><input type="checkbox" data-stem="bass" checked><span class="stem-name">bass</span><audio controls preload="none"></audio><input class="inst" list="instrument-options" data-instrument data-stem="bass" placeholder="instrument (auto)"></label>
-        <label class="stem-card"><input type="checkbox" data-stem="drums"><span class="stem-name">drums</span><audio controls preload="none"></audio><input class="inst" list="instrument-options" data-instrument data-stem="drums" placeholder="instrument (auto)"></label>
-        <label class="stem-card"><input type="checkbox" data-stem="other"><span class="stem-name">other</span><audio controls preload="none"></audio><input class="inst" list="instrument-options" data-instrument data-stem="other" placeholder="instrument (auto)"></label>
-        <label class="stem-card"><input type="checkbox" data-stem="vocals" checked><span class="stem-name">vocals</span><audio controls preload="none"></audio><input class="inst" list="instrument-options" data-instrument data-stem="vocals" placeholder="instrument (auto)"></label>
-        <label class="stem-card"><input type="checkbox" data-stem="guitar" checked><span class="stem-name">guitar</span><audio controls preload="none"></audio><input class="inst" list="instrument-options" data-instrument data-stem="guitar" placeholder="instrument (auto)"></label>
-        <label class="stem-card"><input type="checkbox" data-stem="piano" checked><span class="stem-name">piano</span><audio controls preload="none"></audio><input class="inst" list="instrument-options" data-instrument data-stem="piano" placeholder="instrument (auto)"></label>
+        <label class="stem-card" data-stem="bass">
+          <input type="checkbox" data-stem="bass">
+          <span class="card-rail">
+            <span class="stem-name">bass</span>
+            <span class="card-led"></span>
+          </span>
+          <audio controls preload="none"></audio>
+          <span class="inst-wrap">
+            <span class="inst-tag mono-label">INST</span>
+            <input class="inst" data-instrument data-stem="bass" placeholder="auto" aria-label="bass instrument" autocomplete="off">
+            <div class="inst-dropdown" role="listbox" aria-label="bass instrument options"></div>
+          </span>
+        </label>
+        <label class="stem-card" data-stem="drums">
+          <input type="checkbox" data-stem="drums">
+          <span class="card-rail">
+            <span class="stem-name">drums</span>
+            <span class="card-led"></span>
+          </span>
+          <audio controls preload="none"></audio>
+          <span class="inst-wrap">
+            <span class="inst-tag mono-label">INST</span>
+            <input class="inst" data-instrument data-stem="drums" placeholder="auto" aria-label="drums instrument" autocomplete="off">
+            <div class="inst-dropdown" role="listbox" aria-label="drums instrument options"></div>
+          </span>
+        </label>
+        <label class="stem-card" data-stem="other">
+          <input type="checkbox" data-stem="other">
+          <span class="card-rail">
+            <span class="stem-name">other</span>
+            <span class="card-led"></span>
+          </span>
+          <audio controls preload="none"></audio>
+          <span class="inst-wrap">
+            <span class="inst-tag mono-label">INST</span>
+            <input class="inst" data-instrument data-stem="other" placeholder="auto" aria-label="other instrument" autocomplete="off">
+            <div class="inst-dropdown" role="listbox" aria-label="other instrument options"></div>
+          </span>
+        </label>
+        <label class="stem-card" data-stem="vocals">
+          <input type="checkbox" data-stem="vocals">
+          <span class="card-rail">
+            <span class="stem-name">vocals</span>
+            <span class="card-led"></span>
+          </span>
+          <audio controls preload="none"></audio>
+          <span class="inst-wrap">
+            <span class="inst-tag mono-label">INST</span>
+            <input class="inst" data-instrument data-stem="vocals" placeholder="auto" aria-label="vocals instrument" autocomplete="off">
+            <div class="inst-dropdown" role="listbox" aria-label="vocals instrument options"></div>
+          </span>
+        </label>
+        <label class="stem-card" data-stem="guitar">
+          <input type="checkbox" data-stem="guitar">
+          <span class="card-rail">
+            <span class="stem-name">guitar</span>
+            <span class="card-led"></span>
+          </span>
+          <audio controls preload="none"></audio>
+          <span class="inst-wrap">
+            <span class="inst-tag mono-label">INST</span>
+            <input class="inst" data-instrument data-stem="guitar" placeholder="auto" aria-label="guitar instrument" autocomplete="off">
+            <div class="inst-dropdown" role="listbox" aria-label="guitar instrument options"></div>
+          </span>
+        </label>
+        <label class="stem-card" data-stem="piano">
+          <input type="checkbox" data-stem="piano">
+          <span class="card-rail">
+            <span class="stem-name">piano</span>
+            <span class="card-led"></span>
+          </span>
+          <audio controls preload="none"></audio>
+          <span class="inst-wrap">
+            <span class="inst-tag mono-label">INST</span>
+            <input class="inst" data-instrument data-stem="piano" placeholder="auto" aria-label="piano instrument" autocomplete="off">
+            <div class="inst-dropdown" role="listbox" aria-label="piano instrument options"></div>
+          </span>
+        </label>
       </div>
       <div class="actions">
-        <button id="btn-transcribe" class="primary" type="button">Transcribe selected to MIDI</button>
+        <button id="btn-transcribe" class="primary" type="button">
+          <span class="btn-glyph">▶</span> TRANSCRIBE SELECTED TO MIDI
+        </button>
       </div>
-      <div id="results" class="results"></div>
+      <div id="results" class="results" aria-live="polite"></div>
     </section>
 
+    <!-- config -->
     <aside class="panel settings">
-      <h2>Settings</h2>
-      <div id="settings-form" class="settings-form"></div>
-      <button id="btn-save-settings" class="ghost" type="button">Save settings</button>
-      <p id="settings-note" class="muted"></p>
+      <span class="screw tl"></span>
+      <span class="screw tr"></span>
+      <details open>
+        <summary class="rack-title mono-label">CONFIG</summary>
+        <div id="settings-form" class="settings-form"></div>
+        <div class="actions settings-actions">
+          <button id="btn-save-settings" class="ghost" type="button">SAVE SETTINGS</button>
+          <p id="settings-note" class="muted" aria-live="polite"></p>
+        </div>
+      </details>
     </aside>
-  </div>
+
+    <footer class="foot mono-label">LOCAL CONSOLE · ONE JOB AT A TIME</footer>
+  </main>
+
   <script src="/app.js"></script>
 </body>
 </html>

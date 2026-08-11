@@ -151,7 +151,12 @@ class Separator:
             self.device = "cpu"
 
     def _run_chunk(self, spec_chunk: torch.Tensor):
-        """[2,1025,345] complex -> ([6,2,1025,345] real, [6,2,1025,345] imag) as tensors."""
+        """[2,1025,345] complex -> ([6,2,1025,345] real, [6,2,1025,345] imag) as tensors.
+
+        The ONNX model emits the ALREADY-MASKED (separated) spectrograms per stem.
+        See: https://huggingface.co/elicwhite/bs-roformer-sw-6stem-onnx
+        Wrapper docstring: "Do not multiply them by the input again."
+        """
         r = spec_chunk[None, ...].real.float().numpy()
         i = spec_chunk[None, ...].imag.float().numpy()
         out_r, out_i = self.session.run(None, {"spec_real": r, "spec_imag": i})
@@ -163,14 +168,13 @@ class Separator:
         chunks = split_into_chunks(spec)
         out_dir = Path(out_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
-        acc = [None] * len(STEMS)  # per-stem masked chunk lists
+        acc = [None] * len(STEMS)  # per-stem separated chunk lists
         for idx, chunk in enumerate(chunks):
-            masks_r, masks_i = self._run_chunk(chunk)
+            sep_r, sep_i = self._run_chunk(chunk)
             for s in range(len(STEMS)):
-                mask = masks_r[0, s] + 1j * masks_i[0, s]  # [2,1025,345]
-                masked = chunk * mask
+                separated_spec = sep_r[0, s] + 1j * sep_i[0, s]  # [2,1025,345]
                 acc[s] = acc[s] or []
-                acc[s].append(masked)
+                acc[s].append(separated_spec)
             if on_progress:
                 on_progress(100.0 * (idx + 1) / len(chunks))
         results = []

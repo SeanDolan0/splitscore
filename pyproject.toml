@@ -1,8 +1,10 @@
 [project]
-name = "audio-to-midi"
+name = "splitscore"
 version = "0.1.0"
 description = "Separate audio into stems with BS-RoFormer-SW, then transcribe to MIDI with MuScriptor"
+readme = "README.md"
 requires-python = ">=3.13,<3.14"   # verified on 3.13.14; <3.14 keeps uv on the tested interpreter
+
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
@@ -12,6 +14,9 @@ dependencies = [
     "huggingface-hub>=0.24",
     "muscriptor==0.3.0",
 ]
+
+[project.scripts]
+splitscore = "app.main:main"
 
 [dependency-groups]
 dev = [
@@ -44,3 +49,15 @@ explicit = true
 torch = [
     { index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
+
+# Wheel build: setuptools must include app/static/ (the frontend) or uvx / pip
+# installs start with a 404'd page — static is mounted from the package at runtime.
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["app"]
+
+[tool.setuptools.package-data]
+app = ["static/*"]

@@ -1,4 +1,4 @@
-# AudioToMIDI — Design Spec
+# SplitScore — Design Spec
 
 **Date:** 2026-08-08
 **Status:** Approved

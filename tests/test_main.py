@@ -34,6 +34,13 @@ class FakePipeline:
         return job
     async def separate(self, job):
         await asyncio.sleep(0)
+    def _finish_cancelled(self, job):
+        import shutil
+        job.status = "cancelled"
+        job.error = "Cancelled"
+        if job.output_dir:
+            shutil.rmtree(job.output_dir, ignore_errors=True)
+        job.events.put_nowait({"type": "cancelled", "message": "Cancelled"})
 
 
 def _make_client(tmp_path, monkeypatch):
@@ -139,3 +146,44 @@ def test_put_settings_applies_to_running_pipeline(tmp_path, monkeypatch):
     r = client.put("/api/settings", json={"model_size": "small"})
     assert r.status_code == 200
     assert main.PIPELINE.settings.model_size == "small"
+
+
+def test_cancel_ready_job_discards_stems(tmp_path, monkeypatch):
+    """The reported bug: cancel after stem splitting (status=ready) must finish
+    the job and discard the split stems, not sit there doing nothing."""
+    client = _make_client(tmp_path, monkeypatch)
+    r = client.post("/api/jobs", files={"file": ("song.wav", _make_upload_bytes(), "audio/wav")})
+    job_id = r.json()["job_id"]
+    job = main.PIPELINE.jobs[job_id]
+    (job.output_dir / "stems" / "vocals.wav").write_bytes(b"RIFF")  # simulated split output
+    r = client.post(f"/api/jobs/{job_id}/cancel")
+    assert r.status_code == 200
+    assert job.status == "cancelled"
+    assert not job.output_dir.exists()  # stems discarded
+    assert job.events.get_nowait() == {"type": "cancelled", "message": "Cancelled"}
+
+
+def test_reload_recovery_contract(tmp_path, monkeypatch):
+    """Backend behaviors the frontend resume-on-reload relies on:
+    GET /api/jobs/{id} reflects the live status, and the SSE stream replays
+    events emitted while the tab was closed (so a reloaded page catches up)."""
+    client = _make_client(tmp_path, monkeypatch)
+    r = client.post("/api/jobs", files={"file": ("song.wav", _make_upload_bytes(), "audio/wav")})
+    job_id = r.json()["job_id"]
+    job = main.PIPELINE.jobs[job_id]
+
+    # Simulate events that landed in the queue while the old tab was closed.
+    job.status = "transcribing"
+    job.events.put_nowait({"type": "progress", "phase": "transcribing", "stem": "vocals", "pct": 40})
+    job.events.put_nowait({"type": "midi", "stem": "vocals", "file": "song_vocals.mid"})
+
+    # A reloaded tab reads live status first...
+    assert client.get(f"/api/jobs/{job_id}").json()["status"] == "transcribing"
+    assert client.get("/api/jobs/nope").status_code == 404  # ...and forgets stale ids.
+
+    # ...then reconnects SSE and gets the missed events replayed.
+    job.events.put_nowait({"type": "done"})  # lets the SSE stream terminate
+    with client.stream("GET", f"/api/jobs/{job_id}/events") as stream:
+        body = "".join(stream.iter_text())
+    assert "transcribing" in body and '"stem": "vocals"' in body and '"pct": 40' in body
+    assert "song_vocals.mid" in body and '"type": "done"' in body

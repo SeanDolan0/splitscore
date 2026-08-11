@@ -1,7 +1,7 @@
-# AudioToMIDI
+# SplitScore
 
-Separate an audio file into stems with **BS-RoFormer-SW**, then transcribe the stems
-you choose to **MIDI** with **MuScriptor**. Local web app (FastAPI + vanilla JS).
+Separate an audio file into 6 stems with **BS-RoFormer-SW**, then transcribe the stems
+you choose to **MIDI** with **MuScriptor**. A local web console (FastAPI + vanilla JS).
 
 ```
 audio ──▶ BS-RoFormer-SW ──▶ 6 stems ──▶ MuScriptor ──▶ per-stem .mid
@@ -55,3 +55,11 @@ is adjustable in the Settings panel and persists across runs.
 - MIDI + stem WAVs are written under the configured output folder
   (`./output/<job_id>/stems|midi/`).
 - One job at a time by design.
+
+## License
+
+- **Code:** MIT — see [LICENSE](LICENSE).
+- **Models:** the separation model and the MuScriptor weights are separate and
+  distributed under their own licenses. In particular, MuScriptor's weights are
+  **CC BY-NC 4.0** (non-commercial) and gated on Hugging Face; that restriction
+  applies to the models regardless of this project's MIT license.

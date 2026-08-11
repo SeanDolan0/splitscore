@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import shutil
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -72,17 +73,25 @@ class Pipeline:
         """Push an event from the event loop thread (plain put_nowait)."""
         job.events.put_nowait(event)
 
+    def _finish_cancelled(self, job: Job) -> None:
+        """Idempotent cancel: mark cancelled, discard this job's output, notify SSE."""
+        if job.status == STATUS_CANCELLED:
+            return
+        job.status = STATUS_CANCELLED
+        job.error = "Cancelled"
+        if job.output_dir:
+            shutil.rmtree(job.output_dir, ignore_errors=True)
+        self._emit(job, {"type": "cancelled", "message": "Cancelled"})
+
     async def separate(self, job: Job) -> None:
         if job.cancel.is_set():
-            job.status = STATUS_CANCELLED
-            self._emit(job, {"type": "cancelled"})
+            self._finish_cancelled(job)
             return
         job.status = STATUS_SEPARATING
         async with self._lock:
             try:
                 if job.cancel.is_set():
-                    job.status = STATUS_CANCELLED
-                    self._emit(job, {"type": "cancelled"})
+                    self._finish_cancelled(job)
                     return
                 loop = asyncio.get_running_loop()
 
@@ -97,14 +106,12 @@ class Pipeline:
                     sep.separate, str(job.input_path), job.output_dir / "stems",
                     lambda pct: emit({"type": "progress", "phase": "separating", "pct": pct}))
                 if job.cancel.is_set():
-                    job.status = STATUS_CANCELLED
-                    self._emit(job, {"type": "cancelled"})
+                    self._finish_cancelled(job)
                     return
                 job.status = STATUS_READY
                 emit({"type": "stems", "stems": STEMS})
             except asyncio.CancelledError:
-                job.status = STATUS_CANCELLED
-                self._emit(job, {"type": "cancelled"})
+                self._finish_cancelled(job)
             except Exception as exc:
                 msg = _hf_setup_hint(exc)
                 job.status = STATUS_FAILED
@@ -122,8 +129,7 @@ class Pipeline:
                 loop = asyncio.get_running_loop()
                 for stem in stems:
                     if job.cancel.is_set():
-                        job.status = STATUS_CANCELLED
-                        self._emit(job, {"type": "cancelled"})
+                        self._finish_cancelled(job)
                         return
                     self._emit(job, {"type": "progress", "phase": "transcribing",
                                      "stem": stem, "pct": 0})
@@ -158,8 +164,7 @@ class Pipeline:
                 self._emit(job, {"type": "failed", "message": msg})
                 return
         if job.cancel.is_set():
-            job.status = STATUS_CANCELLED
-            self._emit(job, {"type": "cancelled"})
+            self._finish_cancelled(job)
         else:
             job.status = STATUS_DONE
             self._emit(job, {"type": "done"})

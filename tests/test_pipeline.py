@@ -75,7 +75,7 @@ async def test_cancelled_separation_sets_cancelled(tmp_path):
     pipe = Pipeline(Settings(), separator_factory=FakeSeparator)
     await pipe.separate(job)
     assert job.status == "cancelled"
-    assert _drain(job.events)[-1] == {"type": "cancelled"}
+    assert _drain(job.events)[-1]["type"] == "cancelled"
 
 
 async def test_cancel_during_separation_is_observed(tmp_path):
@@ -93,7 +93,7 @@ async def test_cancel_during_separation_is_observed(tmp_path):
     await pipe.separate(job)
     assert job.status == "cancelled"
     events = _drain(job.events)
-    assert events[-1] == {"type": "cancelled"}
+    assert events[-1]["type"] == "cancelled"
     assert not any(e["type"] == "stems" for e in events)
 
 
@@ -151,3 +151,17 @@ async def test_create_job_registers_and_makes_dirs(tmp_path):
     assert job.output_dir is not None
     assert (job.output_dir / "stems").is_dir()
     assert (job.output_dir / "midi").is_dir()
+
+
+async def test_finish_cancelled_discards_output_and_is_idempotent(tmp_path):
+    job = Job(id="j1", song_name="s", input_path=tmp_path / "in.wav",
+              output_dir=tmp_path / "out", status="ready")
+    (tmp_path / "out" / "stems").mkdir(parents=True)
+    (tmp_path / "out" / "stems" / "vocals.wav").write_bytes(b"RIFF")
+    pipe = Pipeline(Settings())
+    pipe._finish_cancelled(job)
+    assert job.status == "cancelled"
+    assert not (tmp_path / "out").exists()  # stems discarded
+    assert _drain(job.events) == [{"type": "cancelled", "message": "Cancelled"}]
+    pipe._finish_cancelled(job)  # second call is a no-op
+    assert _drain(job.events) == []

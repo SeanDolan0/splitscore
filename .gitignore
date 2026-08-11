@@ -3,6 +3,11 @@ __pycache__/
 .venv/
 output/
 .hf_cache/
+.pytest_cache/
+.superpowers/
+dist/
+build/
+*.egg-info/
 server.log
 app/settings.json
 *.flac

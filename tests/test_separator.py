@@ -53,7 +53,7 @@ import torch
 from app.separator import Separator, load_audio, STEMS
 
 class FakeSession:
-    """Identity separation: masks are all ones, so each stem = the original."""
+    """Identity separation: return input spec as separated spec, so each stem = the original."""
     def __init__(self, precision, device):
         self.precision = precision
         self.device = device
@@ -62,10 +62,8 @@ class FakeSession:
         self.calls += 1
         r = feeds["spec_real"]  # [1,2,1025,345]
         i = feeds["spec_imag"]
-        ones = np.ones_like(r)
-        zeros = np.zeros_like(i)
-        out_r = np.stack([ones] * 6, axis=1)   # [1,6,2,1025,345]
-        out_i = np.stack([zeros] * 6, axis=1)
+        out_r = np.stack([r] * 6, axis=1)   # [1,6,2,1025,345]
+        out_i = np.stack([i] * 6, axis=1)
         return out_r, out_i
 
 
@@ -134,16 +132,15 @@ def test_separate_uses_fake_session_precision_and_device(tmp_path):
 
 
 class ChannelDistinctFakeSession:
-    """Distinct real mask per output channel: channel s scales input by (1 + 0.1*s)."""
+    """Distinct real scale per output channel: channel s returns input * (1 + 0.1*s)."""
     def __init__(self, precision, device):
         self.precision = precision
         self.device = device
     def run(self, output_names, feeds):
         r = feeds["spec_real"]  # [1,2,1025,345]
         i = feeds["spec_imag"]
-        zeros = np.zeros_like(i)
-        out_r = np.stack([np.ones_like(r) * (1.0 + 0.1 * s) for s in range(6)], axis=1)
-        out_i = np.stack([zeros] * 6, axis=1)
+        out_r = np.stack([r * (1.0 + 0.1 * s) for s in range(6)], axis=1)
+        out_i = np.stack([i * (1.0 + 0.1 * s) for s in range(6)], axis=1)
         return out_r, out_i
 
 

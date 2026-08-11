@@ -13,14 +13,14 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from app.pipeline import STATUS_DONE, STATUS_FAILED, STATUS_READY, Pipeline
+from app.pipeline import STATUS_CREATED, STATUS_DONE, STATUS_FAILED, STATUS_READY, Pipeline
 from app.separator import STEMS
 from app.settings import Settings, load_settings, save_settings
 from app.transcribe import list_instruments
 
 ALLOWED_EXTENSIONS = {"wav", "mp3", "flac", "ogg", "m4a", "aiff"}
 
-app = FastAPI(title="AudioToMIDI")
+app = FastAPI(title="SplitScore")
 PIPELINE = Pipeline(load_settings())
 
 _HEARTBEAT = ":" + " " * 15 + "\n\n"  # SSE comment keeps the connection alive
@@ -86,6 +86,10 @@ async def cancel(job_id: str):
     if not job:
         raise HTTPException(404, "Unknown job")
     job.cancel.set()
+    # Idle job (post-separation, waiting to transcribe): no worker coroutine
+    # observes the flag, so finish the cancel here and discard the stems.
+    if job.status in (STATUS_CREATED, STATUS_READY):
+        PIPELINE._finish_cancelled(job)
     return {"ok": True}
 
 
