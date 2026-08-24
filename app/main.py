@@ -225,8 +225,28 @@ async def download_stems_zip(job_id: str):
 app.mount("/", StaticFiles(directory=Path(__file__).parent / "static", html=True), name="static")
 
 
+def _find_free_port(start: int) -> int:
+    """Return the first available port starting from *start*."""
+    import socket
+    for port in range(start, start + 100):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind(("127.0.0.1", port))
+                return port
+            except OSError:
+                continue
+    raise RuntimeError(f"No free port found near {start}")
+
+
 def main() -> None:
+    import argparse
     import uvicorn
-    url = "http://127.0.0.1:8000"
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--port", type=int, default=8000)
+    args = parser.parse_args()
+
+    port = _find_free_port(args.port)
+    url = f"http://127.0.0.1:{port}"
     webbrowser.open(url)
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=port)

@@ -43,7 +43,8 @@ uvx splitscore
 ```
 
 Auto-detects your GPU, installs the correct torch variant and ONNX runtime,
-and opens the app at `http://127.0.0.1:8000`. First run downloads models (~3 GB) to `~/.cache/`.
+and opens the app at `http://127.0.0.1:8000` (auto-falls back to a free port if 8000 is taken).
+First run downloads models (~3 GB) to `~/.cache/`.
 
 ### pip
 
@@ -58,7 +59,8 @@ splitscore
 git clone https://github.com/SeanDolan0/splitscore.git
 cd splitscore
 uv run python sync.py          # auto-detect GPU, install torch
-uv run python -m app           # → http://127.0.0.1:8000
+uv run python -m app           # → http://127.0.0.1:8000 (auto-fallback if busy)
+uv run python -m app --port 9000  # explicit port
 ```
 
 ### Hugging Face setup
