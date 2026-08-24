@@ -61,6 +61,18 @@ uv run python sync.py          # auto-detect GPU, install torch
 uv run python -m app           # → http://127.0.0.1:8000
 ```
 
+### Hugging Face setup
+
+MuScriptor weights are **gated** behind a CC BY-NC 4.0 (non-commercial) license.
+You need a free Hugging Face account before transcription will work:
+
+1. Accept the license at https://huggingface.co/muscriptor/muscriptor
+2. Log in from the terminal:
+   ```bash
+   uv run hf auth login
+   ```
+   (or export `HF_TOKEN=hf_...` in your shell)
+
 ## Requirements
 
 - **Python 3.13** and [uv](https://docs.astral.sh/uv/)
@@ -93,18 +105,6 @@ The separation model outputs 6 stems in a fixed order:
 
 Melodic stems (vocals, piano, guitar, bass) give the cleanest MIDI.
 Drums and "other" tend to transcribe poorly.
-
-### Hugging Face setup
-
-MuScriptor weights are **gated** behind a CC BY-NC 4.0 (non-commercial) license.
-You need a free Hugging Face account:
-
-1. Accept the license at https://huggingface.co/muscriptor/muscriptor
-2. Log in from the terminal:
-   ```bash
-   uv run hf auth login
-   ```
-   (or export `HF_TOKEN=hf_...` in your shell)
 
 ## GPU Support
 
