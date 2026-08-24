@@ -7,15 +7,26 @@ you choose to **MIDI** with **MuScriptor**. A local web console (FastAPI + vanil
 audio ──▶ BS-RoFormer-SW ──▶ 6 stems ──▶ MuScriptor ──▶ per-stem .mid
 ```
 
+## Quick start
+
+```bash
+uvx splitscore
+```
+
+This auto-detects your NVIDIA GPU and installs the correct CUDA torch backend.
+First run downloads models (~3 GB total) into `~/.cache/`.
+
 ## Requirements
 
 - Windows 11 / Linux, Python 3.13, [uv](https://docs.astral.sh/uv/)
-- NVIDIA GPU recommended (the cu128 torch backend is pinned in `pyproject.toml`)
+- NVIDIA GPU recommended — requires [CUDA 12.x Toolkit](https://developer.nvidia.com/cuda-downloads) installed for GPU acceleration (auto-detected; falls back to CPU if missing)
+- Apple Silicon (MPS) and AMD (ROCm) GPUs are also supported
 
-## Setup
+## Setup (development)
 
 ```bash
-uv sync                        # installs deps incl. CUDA torch (~2.5 GB first time)
+uv run python sync.py          # auto-detect GPU, install correct CUDA torch
+uv run python -m app           # start server
 ```
 
 MuScriptor weights are **gated**: you need a free Hugging Face account.
@@ -27,15 +38,6 @@ MuScriptor weights are **gated**: you need a free Hugging Face account.
    uv run hf auth login
    ```
    (or export `HF_TOKEN=hf_...` in your shell).
-
-## Run
-
-```bash
-uv run python -m app
-```
-
-Your browser opens `http://127.0.0.1:8000`. First run downloads the separation model
-(~336 MB) and the MuScriptor weights (large ~2.8 GB) into `~/.cache/`.
 
 ## Usage
 

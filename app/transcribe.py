@@ -55,15 +55,11 @@ def _resolve_instrument(instruments: str | None, stem: str) -> str | None:
 class Transcriber:
     def __init__(self, model_size: str = "large", device: str = "auto"):
         self.model_size = model_size
-        import torch
-        has_cuda = torch.cuda.is_available()
-        if device == "cuda" and not has_cuda:
-            raise RuntimeError(
-                "cuda requested for transcription but torch has no CUDA. "
-                "Reinstall with the cu128 torch backend (see README).")
-        load_device = "cuda" if (has_cuda and device != "cpu") else "cpu"
+        from app.gpu import resolve_torch_device
+        load_device = resolve_torch_device(device)
         # fp16 weights halve VRAM: fp32 weights + beam-search KV cache OOM a
         # 12 GB laptop GPU at beam_size>1 (the app's default).
+        # fp16 is only safe on CUDA; MPS/XPU/CPU use fp32.
         dtype = "float16" if load_device == "cuda" else None
         self.model = TranscriptionModel.load_model(model_size, device=load_device, dtype=dtype)
 

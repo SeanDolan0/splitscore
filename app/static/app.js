@@ -4,8 +4,41 @@ let settings = {};
 let currentJob = null;
 let eventSource = null;
 let renderedFiles = new Set(); // dedup midi events replayed by SSE against stored files
+let currentPlayingAudio = null; // track the currently-playing audio so only one plays at a time
 
 const $ = (id) => document.getElementById(id);
+
+// ---------- hardware badge ----------
+async function loadHardware() {
+  try {
+    const hw = await (await fetch("/api/hardware")).json();
+    const badge = $("hw-badge");
+    const text = $("hw-text");
+    const icon = badge.querySelector(".hw-icon");
+    const sep = hw.separator_device || "unknown";
+    const isCuda = sep === "cuda";
+    const gpuName = hw.gpu?.name || "No GPU";
+    const ortProviders = hw.onnxruntime?.providers || [];
+    const ortActive = ortProviders.includes("CUDAExecutionProvider") ? "CUDA" : "CPU";
+
+    if (isCuda && hw.gpu?.vendor === "nvidia") {
+      icon.innerHTML = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l6.5 3.75v7.5L8 16l-6.5-3.75v-7.5z"/></svg>';
+      badge.classList.add("hw-cuda");
+      text.textContent = `${gpuName} · CUDA · ort:${ortActive}`;
+    } else if (hw.gpu?.vendor === "apple") {
+      icon.textContent = "";
+      badge.classList.add("hw-apple");
+      text.textContent = `Apple Silicon · ort:${ortActive}`;
+    } else {
+      icon.innerHTML = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l6.5 3.75v7.5L8 16l-6.5-3.75v-7.5z"/></svg>';
+      badge.classList.add("hw-cpu");
+      text.textContent = `${gpuName} · ort:${ortActive}`;
+    }
+    badge.title = `torch ${hw.torch?.version || "?"} · onnxruntime ${hw.onnxruntime?.version || "?"}`;
+  } catch {
+    // server not up yet or /api/hardware missing — leave "detecting…" text
+  }
+}
 
 // ---------- settings ----------
 async function loadSettings() {
@@ -159,23 +192,25 @@ function selectDropdownItem(input, dropdown, value) {
 function renderSettingsForm() {
   const splitter = [
     ["separation_precision", "Separation precision", ["fp16", "fp32"],
-     "fp16 halves memory and is faster with negligible quality loss. Pick fp32 only if the stems sound unstable on CPU."],
-    ["model_size", "Model size", ["small", "medium", "large"],
-     "small is fastest and lightest on VRAM; large gives the cleanest separation on dense mixes; medium balances both."],
+     "fp16 uses a smaller model that's faster and uses less memory with virtually identical quality. Use fp32 only if you notice audio artifacts in the separated stems."],
     ["separation_device", "Separation device", ["auto", "cuda", "cpu"],
-     "auto picks CUDA when available, else CPU. Pin a device to force it."],
+     "auto selects the best available hardware — NVIDIA GPU (CUDA) on Windows/Linux, CPU fallback otherwise. On Apple Silicon and AMD GPUs, separation always runs on CPU (ONNX Runtime limitation)."],
+  ];
+  const general = [
     ["output_folder", "Output folder", null,
-     "Base folder for all output. Each job writes <job_id>/ with input/, stems/, and midi/ subfolders inside it."],
+     "Where all output is saved. Each job creates a subfolder with separated stems (.wav) and transcribed MIDI files (.mid)."],
   ];
   const midi = [
+    ["model_size", "Transcription model", ["small", "medium", "large"],
+     "small (103M params) is fastest and works well on CPU. medium (307M) is a balanced choice. large (1.4B) is the most accurate but needs a GPU with 4+ GB VRAM."],
     ["transcription_device", "Transcription device", ["auto", "cuda", "cpu"],
-     "auto picks CUDA when available. MuScriptor is far faster on CUDA; CPU works but is slow."],
-    ["temperature", "Temperature (0 = deterministic)", [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.8, 1.0, 1.5],
-     "Sampling temperature. 0 is deterministic — the same stem always gives the same MIDI. Higher values add variety but more mistakes."],
+     "auto selects the best available hardware. MuScriptor is significantly faster on NVIDIA CUDA. Apple Silicon uses MPS. CPU works but is much slower."],
+    ["temperature", "Temperature", [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.8, 1.0, 1.5],
+     "Controls randomness in note prediction. 0 is deterministic — the same audio always produces the same MIDI. Higher values (0.5–1.0) add natural variation but may introduce wrong notes. Above 1.5 becomes unreliable."],
     ["beam_size", "Beam size", [1, 2, 3, 4, 5, 6, 8],
-     "Beam-search width. Higher = more accurate, slower, more VRAM. Above 1 can OOM a 12 GB GPU — drop to 1 (greedy) if it does."],
+     "How many alternative interpretations the model tracks simultaneously. Higher values find better note sequences but use proportionally more GPU memory. Start with 2–4; drop to 1 if you run out of memory."],
     ["batch_size", "Batch size", [1, 2, 4, 8],
-     "Stems transcribed per batch. Higher = faster but more VRAM; drop to 1 on CUDA out-of-memory."],
+     "How many audio chunks are processed in parallel. Leave at 1 for best quality — higher values can cause artifacts at chunk boundaries. Only increase for faster processing on long files with GPU memory to spare."],
   ];
   const help = (label, desc) =>
     `<span class="q" tabindex="0" role="note" aria-label="Help: ${label}"><span class="tip" role="tooltip">${desc}</span>?</span>`;
@@ -191,12 +226,14 @@ function renderSettingsForm() {
   $("settings-form").innerHTML =
     `<h3 class="settings-group mono-label">Stem splitter</h3>` +
     splitter.map(field).join("") +
-    toggle(["keep_stems", "Keep stem WAVs after conversion", "splitter",
-            "Keep the split .wav stems on disk after MIDI conversion. Turn off to save space."]) +
+    toggle(["keep_stems", "Keep stem WAVs after transcription", "splitter",
+            "Keep the separated .wav stem files on disk after MIDI transcription. Turn off to save disk space."]) +
     `<h3 class="settings-group mono-label">Audio to MIDI</h3>` +
     midi.map(field).join("") +
     toggle(["remember_selection", "Remember last stem selection", "midi",
-            "Restore the stems you last checked across jobs (browser localStorage)."]);
+            "Restore the stems you last checked across jobs (browser localStorage)."]) +
+    `<h3 class="settings-group mono-label">General</h3>` +
+    general.map(field).join("");
 }
 async function saveSettings() {
   const saveBtn = $("btn-save-settings");
@@ -252,6 +289,7 @@ async function upload(file) {
   $("job-panel").classList.remove("hidden");
   $("stem-panel").classList.add("hidden");
   $("results").innerHTML = "";
+  $("midi-actions").classList.add("hidden");
   renderedFiles = new Set();
   setProgress(0, "Separating stems…");
   connectEvents(job_id);
@@ -317,6 +355,7 @@ async function resumeJob() {
   $("job-panel").classList.remove("hidden");
   $("stem-panel").classList.add("hidden");
   $("results").innerHTML = "";
+  $("midi-actions").classList.add("hidden");
   renderedFiles = new Set();
   if (job.status === "ready") {
     setProgress(100, "Separation done");
@@ -344,6 +383,124 @@ async function resumeJob() {
 }
 
 // ---------- stems ----------
+// Custom player initialization
+function initPlayers() {
+  STEMS.forEach((stem) => {
+    const card = document.querySelector(`input[data-stem="${stem}"]`).closest(".stem-card");
+    const audio = card.querySelector("audio");
+    if (!audio || !audio.src) return;
+
+    const playBtn = card.querySelector(".play-btn");
+    const fill = card.querySelector(".progress-fill");
+    const track = card.querySelector(".progress-track");
+    const timeCur = card.querySelector(".time-cur");
+    const timeDur = card.querySelector(".time-dur");
+    const volBtn = card.querySelector(".vol-btn");
+    const volSlider = card.querySelector(".vol-slider");
+    const dlBtn = card.querySelector(".dl-btn");
+
+    // Play/pause
+    const icoPlay = playBtn.querySelector(".ico-play");
+    const icoPause = playBtn.querySelector(".ico-pause");
+    playBtn.onclick = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if (audio.paused) {
+        if (currentPlayingAudio && currentPlayingAudio !== audio) {
+          currentPlayingAudio.pause();
+        }
+        audio.play();
+        card.classList.add("playing");
+        icoPlay.style.display = "none";
+        icoPause.style.display = "";
+        currentPlayingAudio = audio;
+      } else {
+        audio.pause();
+        card.classList.remove("playing");
+        icoPlay.style.display = "";
+        icoPause.style.display = "none";
+      }
+    };
+
+    // Progress update
+    audio.ontimeupdate = () => {
+      if (!audio.duration) return;
+      const pct = (audio.currentTime / audio.duration) * 100;
+      fill.style.width = pct + "%";
+      track.style.setProperty("--fill", pct + "%");
+      timeCur.textContent = fmtTime(audio.currentTime);
+    };
+
+    audio.onloadedmetadata = () => { timeDur.textContent = fmtTime(audio.duration); };
+
+    audio.onended = () => {
+      card.classList.remove("playing");
+      icoPlay.style.display = "";
+      icoPause.style.display = "none";
+      fill.style.width = "0%";
+      track.style.setProperty("--fill", "0%");
+      timeCur.textContent = "0:00";
+    };
+
+    // Seek
+    track.onclick = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if (!audio.duration) return;
+      const rect = track.getBoundingClientRect();
+      const pct = ((e.clientX - rect.left) / rect.width) * 100;
+      fill.style.width = pct + "%";
+      track.style.setProperty("--fill", pct + "%");
+      audio.currentTime = (pct / 100) * audio.duration;
+    };
+
+    // Volume
+    const volSVGs = {
+      off: '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5h2.5L8 2.5v11l-3.5-3H2z" fill="currentColor" stroke="none"/><line x1="11" y1="5" x2="15" y2="11"/><line x1="15" y1="5" x2="11" y2="11"/></svg>',
+      low: '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5h2.5L8 2.5v11l-3.5-3H2z" fill="currentColor" stroke="none"/><path d="M10.5 5.5c.8.7 1.2 1.6 1.2 2.5s-.4 1.8-1.2 2.5"/></svg>',
+      hi: '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5h2.5L8 2.5v11l-3.5-3H2z" fill="currentColor" stroke="none"/><path d="M10.5 5.5c.8.7 1.2 1.6 1.2 2.5s-.4 1.8-1.2 2.5"/><path d="M12.5 3.5c1.4 1.3 2.2 3.1 2.2 4.5s-.8 3.2-2.2 4.5"/></svg>',
+    };
+    const volIcon = (vol) => { volBtn.innerHTML = vol === 0 ? volSVGs.off : vol < 0.5 ? volSVGs.low : volSVGs.hi; };
+    volSlider.oninput = (e) => {
+      e.stopPropagation();
+      audio.volume = parseFloat(volSlider.value);
+      volIcon(audio.volume);
+      volBtn.classList.toggle("muted", audio.volume === 0);
+    };
+
+    volBtn.onclick = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if (audio.volume > 0) {
+        audio._prevVol = audio.volume;
+        audio.volume = 0; volSlider.value = 0;
+        volIcon(0); volBtn.classList.add("muted");
+      } else {
+        audio.volume = audio._prevVol || 1; volSlider.value = audio.volume;
+        volIcon(audio.volume);
+        volBtn.classList.remove("muted");
+      }
+    };
+
+    // Individual download
+    dlBtn.onclick = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if (!currentJob) return;
+      const a = document.createElement("a");
+      a.href = `/output/${currentJob}/stems/${stem}.wav`;
+      a.download = `${stem}.wav`; a.click();
+    };
+  });
+}
+function fmtTime(s) {
+  if (!s || !isFinite(s)) return "0:00";
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return m + ":" + (sec < 10 ? "0" : "") + sec;
+}
+function downloadAllStems() {
+  if (!currentJob) return;
+  const a = document.createElement("a");
+  a.href = `/output/${currentJob}/stems`;
+  a.click();
+}
 function showStems() {
   const remembered = settings.remember_selection
     ? (JSON.parse(localStorage.getItem("checkedStems") || "null") || DEFAULT_CHECKED)
@@ -357,6 +514,7 @@ function showStems() {
     card.querySelector(".inst").value = settings.instrument_by_stem?.[stem] || "";
   });
   $("stem-panel").classList.remove("hidden");
+  initPlayers();
 }
 function selectedStems() {
   return [...document.querySelectorAll('input[data-stem]:checked')].map((el) => el.dataset.stem);
@@ -393,6 +551,14 @@ function addResult(stem, file) {
   link.textContent = `${stem} · ${file}`;
   link.classList.add("result-link");
   $("results").appendChild(link);
+  // show the "Download All MIDI" button once at least one result exists
+  $("midi-actions").classList.remove("hidden");
+}
+function downloadAllMidi() {
+  const links = $("results").querySelectorAll(".result-link");
+  links.forEach((a, i) => {
+    setTimeout(() => { a.click(); }, i * 150);
+  });
 }
 function setConsoleState(state) {
   document.body.dataset.console = state;
@@ -426,6 +592,7 @@ function showNotice(message) {
 }
 
 $("btn-save-settings").addEventListener("click", saveSettings);
+$("btn-download-midi").addEventListener("click", downloadAllMidi);
 $("btn-cancel").addEventListener("click", async () => {
   if (!currentJob) return;
   $("btn-cancel").disabled = true;
@@ -438,6 +605,8 @@ $("btn-cancel").addEventListener("click", async () => {
   }
 });
 $("btn-transcribe").addEventListener("click", transcribeSelected);
+$("btn-download-all").addEventListener("click", downloadAllStems);
 loadSettings().then(resumeJob); // restore a job left running across a reload
 loadInstruments();
 setupDropzone();
+loadHardware();

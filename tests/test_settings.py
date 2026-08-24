@@ -29,21 +29,10 @@ def test_load_missing_file_returns_defaults(tmp_path, monkeypatch):
     assert load_settings() == DEFAULT_SETTINGS
 
 def test_resolve_device_auto_and_explicit(monkeypatch):
-    monkeypatch.setattr("app.settings.torch", _FakeTorch(cuda=True))
+    from app.gpu import GpuInfo
+    monkeypatch.setattr("app.gpu.detect_gpu", lambda: GpuInfo("nvidia", "Fake GPU", "cuda"))
     assert resolve_device("auto") == "cuda"
-    monkeypatch.setattr("app.settings.torch", _FakeTorch(cuda=False))
+    monkeypatch.setattr("app.gpu.detect_gpu", lambda: GpuInfo("none", "No GPU", "cpu"))
     assert resolve_device("auto") == "cpu"
     assert resolve_device("cpu") == "cpu"
     assert resolve_device("cuda") == "cuda"
-
-class _FakeTorch:
-    def __init__(self, cuda):
-        # Mirror real torch: `torch.cuda` is a module-like attribute, so
-        # `resolve_device`'s `torch.cuda.is_available()` call works.
-        self.cuda = _FakeCuda(cuda)
-
-class _FakeCuda:
-    def __init__(self, available):
-        self._available = available
-    def is_available(self):
-        return self._available

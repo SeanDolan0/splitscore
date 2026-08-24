@@ -131,9 +131,23 @@ def _download_model(precision: str) -> Path:
 
 
 def _default_session_factory(precision: str, device: str) -> ort.InferenceSession:
+    import os, sys
+    from app.gpu import resolve_onnx_provider
+
+    # Windows: onnxruntime-gpu needs CUDA DLLs (cublasLt, cudnn) that ship
+    # inside torch's lib/ dir. Add that to the DLL search path so the
+    # provider can find them without requiring a system CUDA toolkit install.
+    if sys.platform == "win32" and device == "cuda":
+        try:
+            import torch
+            torch_lib = Path(torch.__file__).parent / "lib"
+            if torch_lib.is_dir():
+                os.add_dll_directory(str(torch_lib))
+        except Exception:
+            pass
+
     model_path = _download_model(precision)
-    providers = (["CUDAExecutionProvider", "CPUExecutionProvider"]
-                 if device == "cuda" else ["CPUExecutionProvider"])
+    providers = resolve_onnx_provider(device)
     return ort.InferenceSession(str(model_path), providers=providers)
 
 
@@ -143,12 +157,24 @@ class Separator:
         from app.settings import resolve_device
         self.device = resolve_device(device)
         factory = session_factory or _default_session_factory
+        import logging, os, warnings
+        log = logging.getLogger(__name__)
+        stderr_fd = os.dup(2)
+        null_fd = os.open(os.devnull, os.O_WRONLY)
         try:
+            os.dup2(null_fd, 2)
             self.session = factory(self.precision, self.device)
-        except Exception:
+        except Exception as exc:
             # GPU runtime failed (missing provider, download hiccup) -> CPU.
+            log.warning("GPU session failed (%s), falling back to CPU: %s",
+                        self.device, exc)
             self.session = _default_session_factory(self.precision, "cpu")
             self.device = "cpu"
+            warnings.warn(f"GPU provider unavailable ({exc}), running on CPU")
+        finally:
+            os.dup2(stderr_fd, 2)
+            os.close(null_fd)
+            os.close(stderr_fd)
 
     def _run_chunk(self, spec_chunk: torch.Tensor):
         """[2,1025,345] complex -> ([6,2,1025,345] real, [6,2,1025,345] imag) as tensors.

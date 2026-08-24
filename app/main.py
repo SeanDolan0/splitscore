@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 import webbrowser
+import zipfile
 from dataclasses import asdict
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -17,6 +19,7 @@ from app.pipeline import STATUS_CREATED, STATUS_DONE, STATUS_FAILED, STATUS_READ
 from app.separator import STEMS
 from app.settings import Settings, load_settings, save_settings
 from app.transcribe import list_instruments
+from app.gpu import detect_gpu
 
 ALLOWED_EXTENSIONS = {"wav", "mp3", "flac", "ogg", "m4a", "aiff"}
 
@@ -119,6 +122,50 @@ async def get_instruments():
     return {"instruments": instruments}
 
 
+@app.get("/api/hardware")
+async def get_hardware():
+    """Report what compute hardware is available and which provider the models use."""
+    import importlib
+    info = {"torch": None, "onnxruntime": None, "gpu": None,
+            "settings_device": PIPELINE.settings.separation_device,
+            "separator_actual": None}
+
+    # torch
+    try:
+        torch = importlib.import_module("torch")
+        info["torch"] = {
+            "version": torch.__version__,
+            "cuda_available": torch.cuda.is_available(),
+            "cuda_version": torch.version.cuda or None,
+            "gpu_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
+            "gpu_memory_gb": round(torch.cuda.get_device_properties(0).total_memory / 1e9, 1) if torch.cuda.is_available() else None,
+        }
+    except Exception:
+        info["torch"] = {"version": "not installed", "cuda_available": False}
+
+    # onnxruntime
+    try:
+        ort = importlib.import_module("onnxruntime")
+        info["onnxruntime"] = {
+            "version": ort.__version__,
+            "providers": ort.get_available_providers(),
+        }
+    except Exception:
+        info["onnxruntime"] = {"version": "not installed", "providers": []}
+
+    # gpu detection (runtime)
+    gpu = detect_gpu()
+    info["gpu"] = {"vendor": gpu.vendor, "name": gpu.name, "preferred_device": gpu.preferred_device}
+
+    # actual device used by the separator (if any job has run)
+    for job in PIPELINE.jobs.values():
+        if hasattr(job, "_separator_device"):
+            info["separator_actual"] = job._separator_device
+            break
+
+    return info
+
+
 @app.get("/api/settings")
 async def get_settings():
     return load_settings()
@@ -150,6 +197,29 @@ async def download_stem(job_id: str, filename: str):
     if not path.is_relative_to(base) or not path.is_file():
         raise HTTPException(404, "Stem not found")
     return FileResponse(path, media_type="audio/wav")
+
+
+@app.get("/output/{job_id}/stems")
+async def download_stems_zip(job_id: str):
+    """Return all stems as a zip archive for bulk download."""
+    base = Path(PIPELINE.settings.output_folder).resolve()
+    stems_dir = (base / job_id / "stems").resolve()
+    if not stems_dir.is_relative_to(base) or not stems_dir.is_dir():
+        raise HTTPException(404, "Stems not found")
+    wav_files = sorted(stems_dir.glob("*.wav"))
+    if not wav_files:
+        raise HTTPException(404, "No stems found")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for wav in wav_files:
+            zf.write(wav, wav.name)
+    buf.seek(0)
+    zip_name = f"{stems_dir.parent.name}_stems.zip"
+    return Response(
+        content=buf.read(),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{zip_name}"'},
+    )
 
 
 app.mount("/", StaticFiles(directory=Path(__file__).parent / "static", html=True), name="static")

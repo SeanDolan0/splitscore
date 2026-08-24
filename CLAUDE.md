@@ -5,7 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-uv sync                     # install deps incl. CUDA torch (~2.5 GB first time)
+uvx splitscore              # install + run: auto-detects GPU → correct CUDA torch (~2.5 GB first time)
+uv run python sync.py       # dev install: auto-detects GPU, installs torch into local venv
 uv run python -m app        # start server → opens http://127.0.0.1:8000
 uv run pytest               # run all tests
 uv run pytest tests/test_pipeline.py::test_separate_flow_and_events   # single test
@@ -29,7 +30,7 @@ A local web app: separate an audio file into 6 stems (BS-RoFormer-SW via ONNX), 
 ## Key constraints
 
 - **`STEMS` order is sacred.** `["bass", "drums", "other", "vocals", "guitar", "piano"]` must match the ONNX output channel order and is duplicated in `app/separator.py` and `app/settings.py`. Reorder or rename and every stem maps to the wrong channel.
-- **`onnxruntime-gpu` must stay <1.27** (1.27+ is built against CUDA 13; torch is pinned to cu128 / CUDA 12.8 via the `pytorch-cu128` uv index in `pyproject.toml`).
+- **`onnxruntime-gpu` must stay <1.27** (1.27+ is built against CUDA 13). `sync.py` auto-detects the CUDA version and pins torch to the matching wheel (cu118–cu130); without a GPU it installs CPU-only torch from PyPI. On macOS use `--cpu`.
 - **MuScriptor weights are HF-gated** (CC BY-NC 4.0). A gated/401 error during separation or transcription gets `_hf_setup_hint` appended in `pipeline.py`, telling the user to run `hf auth login`.
 - **CUDA OOM during transcription is job-fatal**, not per-stem — `pipeline.py` detects "out of memory"/"cuda error" and fails the whole job with a hint to lower beam/batch size, because continuing would OOM the next stem too. Any *other* per-stem transcription error is non-terminal (emits an `error` event, continues).
 - **fp16 weights are used on CUDA** in `transcribe.py` deliberately: fp32 weights + beam-search KV cache OOMs a 12 GB laptop GPU at `beam_size > 1` (the default).

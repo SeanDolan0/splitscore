@@ -3,20 +3,33 @@ name = "splitscore"
 version = "0.1.0"
 description = "Separate audio into stems with BS-RoFormer-SW, then transcribe to MIDI with MuScriptor"
 readme = "README.md"
-requires-python = ">=3.13,<3.14"   # verified on 3.13.14; <3.14 keeps uv on the tested interpreter
+requires-python = ">=3.13,<3.14"
+license = "MIT"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "Topic :: Multimedia :: Sound/Audio :: MIDI",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+]
 
 dependencies = [
+    "torch>=2.7",
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
-    "onnxruntime-gpu>=1.21,<1.27",  # 1.27+ is built against CUDA 13; torch here is cu128 (CUDA 12.8)
-    "torch>=2.7",
+    "onnxruntime-gpu>=1.21,<1.27",  # 1.27+ is built against CUDA 13
     "soundfile>=0.12",
     "huggingface-hub>=0.24",
     "muscriptor==0.3.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/SeanDolan0/splitscore"
+Repository = "https://github.com/SeanDolan0/splitscore"
+
 [project.scripts]
-splitscore = "app.main:main"
+splitscore = "app.cli:main"
 
 [dependency-groups]
 dev = [
@@ -30,28 +43,25 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
 
-# Resolve only for the platforms the cu128 torch source targets. Without this,
-# uv also resolves for macOS where muscriptor 0.3.0 pins torch<2.3 and the whole
-# resolution fails ("This project requires torch>=2.7" on macOS x86_64).
+# torch is optional: `uvx splitscore` auto-detects GPU and installs it at startup.
+# For dev, run `uv run python sync.py` which detects GPU and installs torch into the venv.
+# Environments restriction prevents muscriptor's macOS torch conflict from breaking resolution.
 [tool.uv]
 environments = [
     "sys_platform == 'win32'",
     "sys_platform == 'linux'",
 ]
 
-# Pin torch to the CUDA 12.8 wheel index on Linux/Windows (macOS has no CUDA wheels).
+# Wheel build: setuptools must include app/static/ (the frontend) or uvx / pip
+# installs start with a 404'd page — static is mounted from the package at runtime.
 [[tool.uv.index]]
-name = "pytorch-cu128"
-url = "https://download.pytorch.org/whl/cu128"
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu130"
 explicit = true
 
 [tool.uv.sources]
-torch = [
-    { index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
-]
+torch = { index = "pytorch" }
 
-# Wheel build: setuptools must include app/static/ (the frontend) or uvx / pip
-# installs start with a 404'd page — static is mounted from the package at runtime.
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"

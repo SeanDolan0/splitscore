@@ -1,5 +1,6 @@
 __pycache__/
 *.pyc
+*.pyo
 .venv/
 output/
 .hf_cache/
@@ -11,3 +12,14 @@ build/
 server.log
 app/settings.json
 *.flac
+*.wav
+*.mp3
+*.ogg
+*.m4a
+*.aiff
+.claude/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~

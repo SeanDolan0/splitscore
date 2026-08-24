@@ -41,13 +41,17 @@ def _hf_setup_hint(exc: Exception) -> str:
     return str(exc)
 
 
-def _is_cuda_oom(exc: Exception) -> bool:
+def _is_oom(exc: Exception) -> bool:
+    """Detect OOM errors across CUDA, MPS, ROCm, and generic memory errors."""
     text = f"{type(exc).__name__}: {exc}".lower()
-    return "out of memory" in text or "cuda error" in text
+    return any(phrase in text for phrase in [
+        "out of memory", "cuda error", "mps backend", "metal",
+        "rocclr", "memory allocation",
+    ])
 
 
 _OOM_MESSAGE = (
-    "CUDA ran out of memory while transcribing. Lower Beam size or Batch size in "
+    "GPU ran out of memory while transcribing. Lower Beam size or Batch size in "
     "Settings (or pick a smaller model), then try again.")
 
 
@@ -148,7 +152,7 @@ class Pipeline:
                         out.write_bytes(midi_bytes)
                         self._emit(job, {"type": "midi", "stem": stem, "file": out.name})
                     except Exception as exc:
-                        if _is_cuda_oom(exc):
+                        if _is_oom(exc):
                             # VRAM exhausted at the KV-cache stage: continuing to
                             # the next stem would OOM again, so fail the job.
                             job.status = STATUS_FAILED

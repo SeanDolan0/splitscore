@@ -29,6 +29,10 @@
           <span class="led led-busy"><i></i>BUSY</span>
           <span class="led led-err"><i></i>ERR</span>
         </div>
+        <div id="hw-badge" class="hw-badge" aria-label="Hardware info">
+          <span class="hw-icon" aria-hidden="true"></span>
+          <span id="hw-text" class="hw-text mono-label">detecting…</span>
+        </div>
       </div>
       <div class="signal-path mono-label" aria-hidden="true">
         <span class="sp on">INPUT</span><span class="sp-dash on"></span>
@@ -77,14 +81,26 @@
         <h2 class="rack-title mono-label">STEM OUTPUTS</h2>
         <p class="rack-sub muted">check channels to transcribe · set an instrument to override the guess</p>
       </header>
-      <div id="stem-grid" class="stem-grid">
+      <div id="stem-list" class="stem-list">
         <label class="stem-card" data-stem="bass">
           <input type="checkbox" data-stem="bass">
-          <span class="card-rail">
+          <div class="card-top">
             <span class="stem-name">bass</span>
             <span class="card-led"></span>
-          </span>
-          <audio controls preload="none"></audio>
+          </div>
+          <div class="player">
+            <button class="player-btn play-btn" type="button" aria-label="Play bass"><svg class="ico-play" width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11l10-5.5z"/></svg><svg class="ico-pause" width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="display:none"><rect x="3" y="2" width="3.5" height="12" rx="1"/><rect x="9.5" y="2" width="3.5" height="12" rx="1"/></svg></button>
+            <div class="player-progress">
+              <div class="progress-track"><div class="progress-fill"></div></div>
+              <div class="time"><span class="time-cur">0:00</span> <span class="time-dur">--:--</span></div>
+            </div>
+            <div class="volume">
+              <button class="player-btn vol-btn" type="button" aria-label="Mute"><svg class="ico-vol" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5h2.5L8 2.5v11l-3.5-3H2z" fill="currentColor" stroke="none"/><path d="M10.5 5.5c.8.7 1.2 1.6 1.2 2.5s-.4 1.8-1.2 2.5"/><path d="M12.5 3.5c1.4 1.3 2.2 3.1 2.2 4.5s-.8 3.2-2.2 4.5"/></svg></button>
+              <input type="range" class="vol-slider" min="0" max="1" step="0.05" value="1" aria-label="Volume">
+            </div>
+            <button class="player-btn dl-btn" type="button" aria-label="Download bass"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 2v9M4.5 8L8 11.5 11.5 8M3 14h10"/></svg></button>
+          </div>
+          <audio preload="none"></audio>
           <span class="inst-wrap">
             <span class="inst-tag mono-label">INST</span>
             <input class="inst" data-instrument data-stem="bass" placeholder="auto" aria-label="bass instrument" autocomplete="off">
@@ -93,11 +109,23 @@
         </label>
         <label class="stem-card" data-stem="drums">
           <input type="checkbox" data-stem="drums">
-          <span class="card-rail">
+          <div class="card-top">
             <span class="stem-name">drums</span>
             <span class="card-led"></span>
-          </span>
-          <audio controls preload="none"></audio>
+          </div>
+          <div class="player">
+            <button class="player-btn play-btn" type="button" aria-label="Play drums"><svg class="ico-play" width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11l10-5.5z"/></svg><svg class="ico-pause" width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="display:none"><rect x="3" y="2" width="3.5" height="12" rx="1"/><rect x="9.5" y="2" width="3.5" height="12" rx="1"/></svg></button>
+            <div class="player-progress">
+              <div class="progress-track"><div class="progress-fill"></div></div>
+              <div class="time"><span class="time-cur">0:00</span> <span class="time-dur">--:--</span></div>
+            </div>
+            <div class="volume">
+              <button class="player-btn vol-btn" type="button" aria-label="Mute"><svg class="ico-vol" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5h2.5L8 2.5v11l-3.5-3H2z" fill="currentColor" stroke="none"/><path d="M10.5 5.5c.8.7 1.2 1.6 1.2 2.5s-.4 1.8-1.2 2.5"/><path d="M12.5 3.5c1.4 1.3 2.2 3.1 2.2 4.5s-.8 3.2-2.2 4.5"/></svg></button>
+              <input type="range" class="vol-slider" min="0" max="1" step="0.05" value="1" aria-label="Volume">
+            </div>
+            <button class="player-btn dl-btn" type="button" aria-label="Download drums"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 2v9M4.5 8L8 11.5 11.5 8M3 14h10"/></svg></button>
+          </div>
+          <audio preload="none"></audio>
           <span class="inst-wrap">
             <span class="inst-tag mono-label">INST</span>
             <input class="inst" data-instrument data-stem="drums" placeholder="auto" aria-label="drums instrument" autocomplete="off">
@@ -106,11 +134,23 @@
         </label>
         <label class="stem-card" data-stem="other">
           <input type="checkbox" data-stem="other">
-          <span class="card-rail">
+          <div class="card-top">
             <span class="stem-name">other</span>
             <span class="card-led"></span>
-          </span>
-          <audio controls preload="none"></audio>
+          </div>
+          <div class="player">
+            <button class="player-btn play-btn" type="button" aria-label="Play other"><svg class="ico-play" width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11l10-5.5z"/></svg><svg class="ico-pause" width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="display:none"><rect x="3" y="2" width="3.5" height="12" rx="1"/><rect x="9.5" y="2" width="3.5" height="12" rx="1"/></svg></button>
+            <div class="player-progress">
+              <div class="progress-track"><div class="progress-fill"></div></div>
+              <div class="time"><span class="time-cur">0:00</span> <span class="time-dur">--:--</span></div>
+            </div>
+            <div class="volume">
+              <button class="player-btn vol-btn" type="button" aria-label="Mute"><svg class="ico-vol" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5h2.5L8 2.5v11l-3.5-3H2z" fill="currentColor" stroke="none"/><path d="M10.5 5.5c.8.7 1.2 1.6 1.2 2.5s-.4 1.8-1.2 2.5"/><path d="M12.5 3.5c1.4 1.3 2.2 3.1 2.2 4.5s-.8 3.2-2.2 4.5"/></svg></button>
+              <input type="range" class="vol-slider" min="0" max="1" step="0.05" value="1" aria-label="Volume">
+            </div>
+            <button class="player-btn dl-btn" type="button" aria-label="Download other"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 2v9M4.5 8L8 11.5 11.5 8M3 14h10"/></svg></button>
+          </div>
+          <audio preload="none"></audio>
           <span class="inst-wrap">
             <span class="inst-tag mono-label">INST</span>
             <input class="inst" data-instrument data-stem="other" placeholder="auto" aria-label="other instrument" autocomplete="off">
@@ -119,11 +159,23 @@
         </label>
         <label class="stem-card" data-stem="vocals">
           <input type="checkbox" data-stem="vocals">
-          <span class="card-rail">
+          <div class="card-top">
             <span class="stem-name">vocals</span>
             <span class="card-led"></span>
-          </span>
-          <audio controls preload="none"></audio>
+          </div>
+          <div class="player">
+            <button class="player-btn play-btn" type="button" aria-label="Play vocals"><svg class="ico-play" width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11l10-5.5z"/></svg><svg class="ico-pause" width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="display:none"><rect x="3" y="2" width="3.5" height="12" rx="1"/><rect x="9.5" y="2" width="3.5" height="12" rx="1"/></svg></button>
+            <div class="player-progress">
+              <div class="progress-track"><div class="progress-fill"></div></div>
+              <div class="time"><span class="time-cur">0:00</span> <span class="time-dur">--:--</span></div>
+            </div>
+            <div class="volume">
+              <button class="player-btn vol-btn" type="button" aria-label="Mute"><svg class="ico-vol" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5h2.5L8 2.5v11l-3.5-3H2z" fill="currentColor" stroke="none"/><path d="M10.5 5.5c.8.7 1.2 1.6 1.2 2.5s-.4 1.8-1.2 2.5"/><path d="M12.5 3.5c1.4 1.3 2.2 3.1 2.2 4.5s-.8 3.2-2.2 4.5"/></svg></button>
+              <input type="range" class="vol-slider" min="0" max="1" step="0.05" value="1" aria-label="Volume">
+            </div>
+            <button class="player-btn dl-btn" type="button" aria-label="Download vocals"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 2v9M4.5 8L8 11.5 11.5 8M3 14h10"/></svg></button>
+          </div>
+          <audio preload="none"></audio>
           <span class="inst-wrap">
             <span class="inst-tag mono-label">INST</span>
             <input class="inst" data-instrument data-stem="vocals" placeholder="auto" aria-label="vocals instrument" autocomplete="off">
@@ -132,11 +184,23 @@
         </label>
         <label class="stem-card" data-stem="guitar">
           <input type="checkbox" data-stem="guitar">
-          <span class="card-rail">
+          <div class="card-top">
             <span class="stem-name">guitar</span>
             <span class="card-led"></span>
-          </span>
-          <audio controls preload="none"></audio>
+          </div>
+          <div class="player">
+            <button class="player-btn play-btn" type="button" aria-label="Play guitar"><svg class="ico-play" width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11l10-5.5z"/></svg><svg class="ico-pause" width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="display:none"><rect x="3" y="2" width="3.5" height="12" rx="1"/><rect x="9.5" y="2" width="3.5" height="12" rx="1"/></svg></button>
+            <div class="player-progress">
+              <div class="progress-track"><div class="progress-fill"></div></div>
+              <div class="time"><span class="time-cur">0:00</span> <span class="time-dur">--:--</span></div>
+            </div>
+            <div class="volume">
+              <button class="player-btn vol-btn" type="button" aria-label="Mute"><svg class="ico-vol" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5h2.5L8 2.5v11l-3.5-3H2z" fill="currentColor" stroke="none"/><path d="M10.5 5.5c.8.7 1.2 1.6 1.2 2.5s-.4 1.8-1.2 2.5"/><path d="M12.5 3.5c1.4 1.3 2.2 3.1 2.2 4.5s-.8 3.2-2.2 4.5"/></svg></button>
+              <input type="range" class="vol-slider" min="0" max="1" step="0.05" value="1" aria-label="Volume">
+            </div>
+            <button class="player-btn dl-btn" type="button" aria-label="Download guitar"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 2v9M4.5 8L8 11.5 11.5 8M3 14h10"/></svg></button>
+          </div>
+          <audio preload="none"></audio>
           <span class="inst-wrap">
             <span class="inst-tag mono-label">INST</span>
             <input class="inst" data-instrument data-stem="guitar" placeholder="auto" aria-label="guitar instrument" autocomplete="off">
@@ -145,11 +209,23 @@
         </label>
         <label class="stem-card" data-stem="piano">
           <input type="checkbox" data-stem="piano">
-          <span class="card-rail">
+          <div class="card-top">
             <span class="stem-name">piano</span>
             <span class="card-led"></span>
-          </span>
-          <audio controls preload="none"></audio>
+          </div>
+          <div class="player">
+            <button class="player-btn play-btn" type="button" aria-label="Play piano"><svg class="ico-play" width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11l10-5.5z"/></svg><svg class="ico-pause" width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="display:none"><rect x="3" y="2" width="3.5" height="12" rx="1"/><rect x="9.5" y="2" width="3.5" height="12" rx="1"/></svg></button>
+            <div class="player-progress">
+              <div class="progress-track"><div class="progress-fill"></div></div>
+              <div class="time"><span class="time-cur">0:00</span> <span class="time-dur">--:--</span></div>
+            </div>
+            <div class="volume">
+              <button class="player-btn vol-btn" type="button" aria-label="Mute"><svg class="ico-vol" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5h2.5L8 2.5v11l-3.5-3H2z" fill="currentColor" stroke="none"/><path d="M10.5 5.5c.8.7 1.2 1.6 1.2 2.5s-.4 1.8-1.2 2.5"/><path d="M12.5 3.5c1.4 1.3 2.2 3.1 2.2 4.5s-.8 3.2-2.2 4.5"/></svg></button>
+              <input type="range" class="vol-slider" min="0" max="1" step="0.05" value="1" aria-label="Volume">
+            </div>
+            <button class="player-btn dl-btn" type="button" aria-label="Download piano"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 2v9M4.5 8L8 11.5 11.5 8M3 14h10"/></svg></button>
+          </div>
+          <audio preload="none"></audio>
           <span class="inst-wrap">
             <span class="inst-tag mono-label">INST</span>
             <input class="inst" data-instrument data-stem="piano" placeholder="auto" aria-label="piano instrument" autocomplete="off">
@@ -159,10 +235,14 @@
       </div>
       <div class="actions">
         <button id="btn-transcribe" class="primary" type="button">
-          <span class="btn-glyph">▶</span> TRANSCRIBE SELECTED TO MIDI
+          <span class="btn-glyph"><svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:-1px"><path d="M4 2.5v11l10-5.5z"/></svg></span> TRANSCRIBE SELECTED TO MIDI
         </button>
+        <button id="btn-download-all" class="ghost" type="button"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-2px;margin-right:4px"><path d="M8 2v9M4.5 8L8 11.5 11.5 8M3 14h10"/></svg>DOWNLOAD ALL STEMS</button>
       </div>
       <div id="results" class="results" aria-live="polite"></div>
+      <div id="midi-actions" class="actions hidden">
+        <button id="btn-download-midi" class="ghost" type="button"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-2px;margin-right:4px"><path d="M8 2v9M4.5 8L8 11.5 11.5 8M3 14h10"/></svg>DOWNLOAD ALL MIDI</button>
+      </div>
     </section>
 
     <!-- config -->
