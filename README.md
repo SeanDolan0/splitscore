@@ -20,8 +20,10 @@ and opens the app in your browser. First run downloads models (~3 GB) into `~/.c
 
 - **Python 3.13** and [uv](https://docs.astral.sh/uv/)
 - **Windows 11** or **Linux**
-- **NVIDIA GPU** recommended — requires [CUDA 12.x Toolkit](https://developer.nvidia.com/cuda-downloads) for GPU acceleration
-- Apple Silicon (MPS) and AMD (ROCm) GPUs also supported; falls back to CPU if nothing else is available
+- **NVIDIA GPU** recommended for best performance — CUDA toolkit is **not** required (bundled with torch)
+- **AMD GPU** (Linux, ROCm) works fully for both separation and transcription
+- **Apple Silicon** — separation runs on CPU (ONNX has no Apple GPU provider), transcription uses MPS
+- **Intel GPU** — falls back to CPU for both (no ONNX/ROCm provider available)
 
 ## Setup (development)
 
