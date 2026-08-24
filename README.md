@@ -65,7 +65,7 @@ uv run python -m app           # → http://127.0.0.1:8000
 
 - **Python 3.13** and [uv](https://docs.astral.sh/uv/)
 - **Windows 11** or **Linux**
-- **NVIDIA GPU** recommended — CUDA toolkit is **not** required (bundled with torch)
+- **NVIDIA GPU** recommended 
 - **AMD GPU** (Linux, ROCm) works fully for both separation and transcription
 - **Apple Silicon** — separation runs on CPU (ONNX has no Apple GPU provider), transcription uses MPS
 - **Intel GPU** — falls back to CPU for both (no ONNX/ROCm provider available)
