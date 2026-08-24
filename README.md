@@ -13,7 +13,7 @@ A local web console — no cloud, no accounts after initial model download.
 audio ──▶ BS-RoFormer-SW ──▶ 6 stems ──▶ MuScriptor ──▶ per-stem .mid
 ```
 
-![SplitScore console](docs/screenshot.png)
+![SplitScore console](https://raw.githubusercontent.com/SeanDolan0/splitscore/master/docs/screenshot.png)
 
 ## Table of Contents
 
