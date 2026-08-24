@@ -18,6 +18,7 @@ app/settings.json
 *.m4a
 *.aiff
 .claude/
+.playwright-mcp/
 .DS_Store
 Thumbs.db
 *.swp
