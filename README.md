@@ -1,46 +1,74 @@
 # SplitScore
 
+![License](https://img.shields.io/github/license/SeanDolan0/splitscore) ![PyPI version](https://img.shields.io/pypi/v/splitscore) ![Build](https://img.shields.io/github/actions/workflow/status/SeanDolan0/splitscore/publish.yml) ![Last Commit](https://img.shields.io/github/last-commit/SeanDolan0/splitscore) ![Top Language](https://img.shields.io/github/languages/top/SeanDolan0/splitscore)
+
 Separate any audio file into 6 stems, then transcribe the ones you want to MIDI.
-A local web console — no cloud, no accounts needed after initial model download.
+A local web console — no cloud, no accounts after initial model download.
 
 ```
 audio ──▶ BS-RoFormer-SW ──▶ 6 stems ──▶ MuScriptor ──▶ per-stem .mid
 ```
 
-## Quick start
+![SplitScore console](docs/screenshot.png)
+
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Requirements](#requirements)
+- [Usage](#usage)
+- [GPU Support](#gpu-support)
+- [Settings](#settings)
+- [API](#api)
+- [Project Structure](#project-structure)
+- [Testing](#testing)
+- [License](#license)
+
+## Features
+
+- 6-stem audio separation via BS-RoFormer-SW (ONNX inference)
+- Per-stem MIDI transcription via MuScriptor (small / medium / large models)
+- Local web console — drag-and-drop, progress bars, inline audio previews
+- Auto-detects NVIDIA, AMD, Intel, and Apple Silicon GPUs
+- One-command install via `uvx` — correct torch + ONNX backends installed automatically
+- Configurable beam size, temperature, batch size, and model size
+- REST API with SSE progress streaming
+
+## Installation
+
+### uvx (recommended)
 
 ```bash
 uvx splitscore
 ```
 
-This auto-detects your GPU, installs the correct torch + onnxruntime backends,
-and opens the app in your browser. First run downloads models (~3 GB) into `~/.cache/`.
+Auto-detects your GPU, installs the correct torch variant and ONNX runtime,
+and opens the app at `http://127.0.0.1:8000`. First run downloads models (~3 GB) to `~/.cache/`.
+
+### pip
+
+```bash
+pip install splitscore
+splitscore
+```
+
+### From source
+
+```bash
+git clone https://github.com/SeanDolan0/splitscore.git
+cd splitscore
+uv run python sync.py          # auto-detect GPU, install torch
+uv run python -m app           # → http://127.0.0.1:8000
+```
 
 ## Requirements
 
 - **Python 3.13** and [uv](https://docs.astral.sh/uv/)
 - **Windows 11** or **Linux**
-- **NVIDIA GPU** recommended for best performance — CUDA toolkit is **not** required (bundled with torch)
+- **NVIDIA GPU** recommended — CUDA toolkit is **not** required (bundled with torch)
 - **AMD GPU** (Linux, ROCm) works fully for both separation and transcription
 - **Apple Silicon** — separation runs on CPU (ONNX has no Apple GPU provider), transcription uses MPS
 - **Intel GPU** — falls back to CPU for both (no ONNX/ROCm provider available)
-
-## Setup (development)
-
-```bash
-uv run python sync.py          # auto-detect GPU, install correct torch variant
-uv run python -m app           # start server → http://127.0.0.1:8000
-```
-
-MuScriptor weights are **gated** behind a CC BY-NC 4.0 (non-commercial) license.
-You need a free Hugging Face account:
-
-1. Accept the license at https://huggingface.co/muscriptor/muscriptor
-2. Log in from the terminal:
-   ```bash
-   uv run hf auth login
-   ```
-   (or export `HF_TOKEN=hf_...` in your shell)
 
 ## Usage
 
@@ -50,7 +78,7 @@ You need a free Hugging Face account:
 4. **Set instruments** — each stem gets an instrument dropdown; leave blank for auto-detect, or pick a specific instrument (piano, guitar, sax, synth, choir, etc.).
 5. **Transcribe** — hit "TRANSCRIBE SELECTED TO MIDI" and download the `.mid` files.
 
-## Stems
+### Stems
 
 The separation model outputs 6 stems in a fixed order:
 
@@ -66,18 +94,49 @@ The separation model outputs 6 stems in a fixed order:
 Melodic stems (vocals, piano, guitar, bass) give the cleanest MIDI.
 Drums and "other" tend to transcribe poorly.
 
+### Hugging Face setup
+
+MuScriptor weights are **gated** behind a CC BY-NC 4.0 (non-commercial) license.
+You need a free Hugging Face account:
+
+1. Accept the license at https://huggingface.co/muscriptor/muscriptor
+2. Log in from the terminal:
+   ```bash
+   uv run hf auth login
+   ```
+   (or export `HF_TOKEN=hf_...` in your shell)
+
+## GPU Support
+
+SplitScore auto-detects your hardware on startup:
+
+| GPU | Torch variant | ONNX Runtime | Notes |
+|-----|--------------|--------------|-------|
+| NVIDIA | CUDA (auto-matched to driver) | onnxruntime-gpu | Best performance. No CUDA toolkit needed. |
+| AMD | ROCm | onnxruntime-rocm | Linux only. |
+| Intel | CPU | onnxruntime-directml | Windows only. |
+| Apple Silicon | MPS | onnxruntime (CPU) | ONNX has no Apple GPU provider; separation runs on CPU. |
+| None | CPU | onnxruntime | Works, just slower. |
+
+The `sync.py` script handles all of this during dev setup.
+The `splitscore` CLI handles it automatically for end users.
+
 ## Settings
 
 All settings are adjustable in the web console's config panel and persist across runs.
 
-### Separation
+<details>
+<summary>Separation</summary>
 
 | Setting | Default | Notes |
 |---------|---------|-------|
 | Device | auto | Compute device for ONNX inference. Auto-detects best GPU. |
 | Precision | fp16 | fp16 (~336 MB model, faster, less VRAM) or fp32 (~669 MB). Switch to fp32 only if you hear artifacts. |
 
-### Transcription (MuScriptor)
+</details>
+
+<details>
+<summary>Transcription (MuScriptor)</summary>
 
 | Setting | Default | Notes |
 |---------|---------|-------|
@@ -87,7 +146,10 @@ All settings are adjustable in the web console's config panel and persist across
 | Beam size | 4 | Higher = better sequences, more VRAM. 1 = greedy. |
 | Batch size | 1 | 1 = best quality (enables prelude forcing). Higher = faster on long files but can cause chunk-boundary artifacts. |
 
-### General
+</details>
+
+<details>
+<summary>General</summary>
 
 | Setting | Default | Notes |
 |---------|---------|-------|
@@ -95,20 +157,7 @@ All settings are adjustable in the web console's config panel and persist across
 | Keep stems | on | Keep separated WAV files after transcription. Turn off to save disk space. |
 | Remember selection | on | Restore your last stem checkboxes across jobs via browser storage. |
 
-## GPU support
-
-SplitScore auto-detects your hardware on startup:
-
-| GPU | Torch variant | ONNX Runtime | Notes |
-|-----|--------------|--------------|-------|
-| NVIDIA | CUDA (auto-matched to driver) | onnxruntime-gpu | Best performance. Requires CUDA toolkit. |
-| AMD | ROCm | onnxruntime-rocm | Linux only. |
-| Intel | CPU | onnxruntime-directml | Windows only. |
-| Apple Silicon | MPS | onnxruntime (CPU) | ONNX has no Apple GPU provider; separation runs on CPU. |
-| None | CPU | onnxruntime | Works, just slower. |
-
-The `sync.py` script handles all of this during dev setup.
-The `splitscore` CLI handles it automatically for end users.
+</details>
 
 ## API
 
@@ -126,7 +175,7 @@ The app exposes a REST API consumed by the frontend:
 | GET | `/api/instruments` | MuScriptor instrument vocabulary |
 | GET | `/api/hardware` | GPU info, torch/CUDA/ONNX versions |
 
-## Project structure
+## Project Structure
 
 ```
 splitscore/
