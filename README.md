@@ -1,6 +1,10 @@
 # SplitScore
 
-![License](https://img.shields.io/github/license/SeanDolan0/splitscore) ![PyPI version](https://img.shields.io/pypi/v/splitscore) ![Build](https://img.shields.io/github/actions/workflow/status/SeanDolan0/splitscore/publish.yml) ![Last Commit](https://img.shields.io/github/last-commit/SeanDolan0/splitscore) ![Top Language](https://img.shields.io/github/languages/top/SeanDolan0/splitscore)
+[![License](https://img.shields.io/github/license/SeanDolan0/splitscore)](https://github.com/SeanDolan0/splitscore/blob/master/LICENSE)
+[![PyPI version](https://img.shields.io/pypi/v/splitscore)](https://pypi.org/project/splitscore/)
+[![Build](https://img.shields.io/github/actions/workflow/status/SeanDolan0/splitscore/publish.yml)](https://github.com/SeanDolan0/splitscore/actions/workflows/publish.yml)
+[![Last Commit](https://img.shields.io/github/last-commit/SeanDolan0/splitscore)](https://github.com/SeanDolan0/splitscore/commits/master)
+[![Top Language](https://img.shields.io/github/languages/top/SeanDolan0/splitscore)](https://github.com/SeanDolan0/splitscore)
 
 Separate any audio file into 6 stems, then transcribe the ones you want to MIDI.
 A local web console — no cloud, no accounts after initial model download.
