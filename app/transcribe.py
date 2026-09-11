@@ -42,14 +42,22 @@ def _resolve_instrument(instruments: str | None, stem: str) -> str | None:
     """
     if not instruments:
         return None
-    if instruments == stem or instruments in STEMS:
+    raw = instruments.strip()
+    if not raw:
+        return None
+    cleaned = raw.lower().replace(" ", "_").replace("-", "_")
+    if raw == stem or raw in STEMS or cleaned == stem or cleaned in STEMS:
         return None
     valid = list_instruments()
-    if valid and instruments not in valid:
+    if valid:
+        if cleaned in valid:
+            return cleaned
+        if raw in valid:
+            return raw
         raise ValueError(
-            f"Unknown instrument {instruments!r}. Valid names: "
+            f"Unknown instrument {raw!r}. Valid names: "
             f"{', '.join(sorted(valid))}")
-    return instruments
+    return cleaned or raw
 
 
 class Transcriber:

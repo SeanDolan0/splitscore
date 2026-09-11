@@ -101,6 +101,26 @@ function initInstrumentDropdowns() {
     input.addEventListener("keydown", (e) => handleDropdownKeydown(e, input));
   });
 }
+function formatInstrumentName(raw) {
+  if (!raw) return "";
+  const known = {
+    "fm_synth": "FM Synth",
+    "fx": "FX",
+    "midi": "MIDI",
+    "808": "808",
+  };
+  const key = raw.toLowerCase().trim();
+  if (known[key]) return known[key];
+  return raw
+    .split(/[\s_]+/)
+    .map((word) => {
+      const wLower = word.toLowerCase();
+      if (known[wLower]) return known[wLower];
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(" ");
+}
+
 function categorizeInstruments(instruments) {
   const cats = { keyboard: [], guitar: [], bass: [], strings: [], wind: [], percussion: [], synth: [], vocal: [], other: [] };
   for (const inst of instruments) {
@@ -128,7 +148,8 @@ function buildDropdownHTML(cats) {
   for (const cat of order) {
     if (!cats[cat]) continue;
     for (const inst of cats[cat]) {
-      html += `<div class="inst-dropdown__item" role="option" data-value="${inst.replace(/"/g, "&quot;")}"><span class="inst-category">${labels[cat]}</span>${inst}</div>`;
+      const displayName = formatInstrumentName(inst);
+      html += `<div class="inst-dropdown__item" role="option" data-value="${displayName.replace(/"/g, "&quot;")}" data-raw="${inst.replace(/"/g, "&quot;")}"><span class="inst-category">${labels[cat]}</span>${displayName}</div>`;
     }
   }
   html += `</div>
@@ -149,9 +170,14 @@ function closeDropdown(dropdown) {
   dropdown.classList.remove("open");
 }
 function filterDropdown(dropdown, query) {
-  const q = query.toLowerCase();
+  const q = query.toLowerCase().trim();
+  const qNorm = q.replace(/[\s\-_]+/g, "");
   dropdown.querySelectorAll(".inst-dropdown__item").forEach((item) => {
-    const match = item.dataset.value.toLowerCase().includes(q);
+    const val = (item.dataset.value || "").toLowerCase();
+    const raw = (item.dataset.raw || "").toLowerCase();
+    const valNorm = val.replace(/[\s\-_]+/g, "");
+    const rawNorm = raw.replace(/[\s\-_]+/g, "");
+    const match = val.includes(q) || raw.includes(q) || (qNorm && (valNorm.includes(qNorm) || rawNorm.includes(qNorm)));
     item.style.display = match ? "flex" : "none";
   });
   // Clear highlight if no visible items match
@@ -161,9 +187,14 @@ function filterDropdown(dropdown, query) {
   }
 }
 function highlightMatching(dropdown, value) {
+  const val = (value || "").toLowerCase().trim();
+  const valNorm = val.replace(/[\s\-_]+/g, "");
   dropdown.querySelectorAll(".inst-dropdown__item").forEach((item) => {
-    item.classList.toggle("highlighted", item.dataset.value === value);
-    item.classList.toggle("selected", item.dataset.value === value);
+    const itemVal = (item.dataset.value || "").toLowerCase();
+    const itemRaw = (item.dataset.raw || "").toLowerCase();
+    const isMatch = val && (itemVal === val || itemRaw === val || (valNorm && itemVal.replace(/[\s\-_]+/g, "") === valNorm));
+    item.classList.toggle("highlighted", isMatch);
+    item.classList.toggle("selected", isMatch);
   });
 }
 function handleDropdownKeydown(e, input) {
@@ -278,24 +309,144 @@ async function saveSettings() {
   }
 }
 
-// ---------- upload ----------
+// ---------- upload & action prompt ----------
+let pendingFile = null;
+
+function showActionModal(file) {
+  if (!file) return;
+  pendingFile = file;
+  const title = $("modal-track-name");
+  if (title) title.textContent = file.name;
+  const directInput = $("direct-inst");
+  if (directInput) directInput.value = "";
+  const modal = $("action-modal");
+  if (modal) {
+    modal.classList.remove("hidden");
+    const dd = modal.querySelector(".inst-dropdown");
+    if (dd) closeDropdown(dd);
+  }
+}
+
+function hideActionModal() {
+  const modal = $("action-modal");
+  if (modal) {
+    modal.classList.add("hidden");
+    const dd = modal.querySelector(".inst-dropdown");
+    if (dd) closeDropdown(dd);
+  }
+  pendingFile = null;
+  const input = $("file-input");
+  if (input) input.value = "";
+}
+
+function updateSignalPath(mode) {
+  const spStems = $("sp-stems");
+  const spDash1 = $("sp-dash-1");
+  const spDash2 = $("sp-dash-2");
+  const spMidi = $("sp-midi");
+  if (mode === "direct") {
+    if (spStems) spStems.classList.remove("on");
+    if (spDash1) spDash1.classList.remove("on");
+    if (spDash2) spDash2.classList.add("on");
+    if (spMidi) spMidi.classList.add("on");
+  } else {
+    if (spStems) spStems.classList.add("on");
+    if (spDash1) spDash1.classList.add("on");
+    if (spDash2) spDash2.classList.remove("on");
+    if (spMidi) spMidi.classList.remove("on");
+  }
+}
+
 function setupDropzone() {
   const dz = $("drop-zone");
   const input = $("file-input");
-  dz.addEventListener("click", () => input.click());
-  dz.addEventListener("dragover", (e) => { e.preventDefault(); dz.classList.add("over"); });
-  dz.addEventListener("dragleave", () => dz.classList.remove("over"));
-  dz.addEventListener("drop", (e) => {
-    e.preventDefault(); dz.classList.remove("over");
-    if (e.dataTransfer.files.length) upload(e.dataTransfer.files[0]);
+
+  window.addEventListener("dragover", (e) => e.preventDefault());
+  window.addEventListener("drop", (e) => e.preventDefault());
+
+  input.addEventListener("click", (e) => {
+    e.stopPropagation();
+    input.value = ""; // Reset so re-selecting the same file fires change event
   });
-  input.addEventListener("change", () => { if (input.files.length) upload(input.files[0]); });
-  dz.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") input.click(); });
+
+  dz.addEventListener("click", (e) => {
+    if (e.target !== input) input.click();
+  });
+
+  dz.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dz.classList.add("over");
+  });
+
+  dz.addEventListener("dragleave", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dz.classList.remove("over");
+  });
+
+  dz.addEventListener("drop", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dz.classList.remove("over");
+    const files = e.dataTransfer?.files;
+    if (files && files.length) {
+      showActionModal(files[0]);
+    }
+  });
+
+  input.addEventListener("change", () => {
+    const files = input.files;
+    if (files && files.length) {
+      showActionModal(files[0]);
+    }
+  });
+
+  dz.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      input.click();
+    }
+  });
+
+  // Modal actions
+  $("btn-action-separate").addEventListener("click", () => {
+    if (!pendingFile) return;
+    const file = pendingFile;
+    hideActionModal();
+    upload(file, "separate");
+  });
+
+  $("btn-action-transcribe").addEventListener("click", () => {
+    if (!pendingFile) return;
+    const file = pendingFile;
+    const inst = $("direct-inst") ? $("direct-inst").value.trim() : "";
+    hideActionModal();
+    upload(file, "transcribe", inst);
+  });
+
+  $("btn-modal-cancel").addEventListener("click", hideActionModal);
+
+  // Close modal when clicking backdrop outside window
+  $("action-modal").addEventListener("click", (e) => {
+    if (e.target === $("action-modal")) hideActionModal();
+  });
+
+  // ESC key to close modal
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("action-modal").classList.contains("hidden")) {
+      const openDd = $("action-modal").querySelector(".inst-dropdown.open");
+      if (!openDd) hideActionModal();
+    }
+  });
 }
-async function upload(file) {
+
+async function upload(file, mode = "separate", instrument = "") {
   $("job-error").classList.add("hidden");
   const fd = new FormData();
   fd.append("file", file);
+  fd.append("mode", mode);
+  if (instrument) fd.append("instrument", instrument);
   const resp = await fetch("/api/jobs", { method: "POST", body: fd });
   if (!resp.ok) { showError((await resp.json()).detail); return; }
   const { job_id } = await resp.json();
@@ -308,7 +459,13 @@ async function upload(file) {
   $("results").innerHTML = "";
   $("midi-actions").classList.add("hidden");
   renderedFiles = new Set();
-  setProgress(0, "Separating stems…");
+  if (mode === "transcribe") {
+    setProgress(0, "Transcribing audio…");
+    updateSignalPath("direct");
+  } else {
+    setProgress(0, "Separating stems…");
+    updateSignalPath("separate");
+  }
   connectEvents(job_id);
 }
 
@@ -330,8 +487,12 @@ function connectEvents(jobId) {
       loadHardware();
     } else if (ev.type === "midi") {
       addResult(ev.stem, ev.file);
+      $("sp-midi")?.classList.add("on");
+      $("sp-dash-2")?.classList.add("on");
     } else if (ev.type === "done") {
       setProgress(100, "Done");
+      $("sp-midi")?.classList.add("on");
+      $("sp-dash-2")?.classList.add("on");
       localStorage.removeItem("jobId");
       endJob();
     } else if (ev.type === "error") {
@@ -357,8 +518,9 @@ function endJob() {
 // ---------- reload recovery ----------
 function renderStoredMidi(files, songName) {
   (files || []).forEach((file) => {
-    const stem = file.replace(`${songName}_`, "").replace(/\.mid$/, "");
-    addResult(stem || "midi", file);
+    let stem = file.replace(`${songName}_`, "").replace(/\.mid$/, "");
+    if (stem === songName || !stem) stem = "audio";
+    addResult(stem, file);
   });
 }
 async function resumeJob() {
@@ -381,10 +543,13 @@ async function resumeJob() {
   if (job.status === "ready") {
     setProgress(100, "Separation done");
     showStems();
+    updateSignalPath("separate");
     connectEvents(id); // catch transcription events once the user restarts it
   } else if (job.status === "done") {
     setProgress(100, "Done");
     renderStoredMidi(job.midi, job.song_name);
+    $("sp-midi")?.classList.add("on");
+    $("sp-dash-2")?.classList.add("on");
     localStorage.removeItem("jobId");
     endJob();
   } else if (job.status === "failed") {
@@ -398,6 +563,7 @@ async function resumeJob() {
   } else {
     // created / separating / transcribing — reconnect SSE; queued events replay the gap.
     setProgress(0, job.status === "transcribing" ? "Transcribing…" : "Separating stems…");
+    updateSignalPath(job.status === "transcribing" ? "direct" : "separate");
     renderStoredMidi(job.midi, job.song_name);
     connectEvents(id);
   }
@@ -532,7 +698,7 @@ function showStems() {
     const card = document.querySelector(`input[data-stem="${stem}"]`).closest(".stem-card");
     card.querySelector('input[type="checkbox"]').checked = remembered.includes(stem);
     card.querySelector("audio").src = `/output/${currentJob}/stems/${stem}.wav`;
-    card.querySelector(".inst").value = settings.instrument_by_stem?.[stem] || "";
+    card.querySelector(".inst").value = formatInstrumentName(settings.instrument_by_stem?.[stem] || "");
   });
   $("stem-panel").classList.remove("hidden");
   initPlayers();

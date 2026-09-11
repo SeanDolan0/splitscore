@@ -173,3 +173,55 @@ class Pipeline:
         else:
             job.status = STATUS_DONE
             self._emit(job, {"type": "done"})
+
+    async def transcribe_direct(self, job: Job, instrument: str | None = None,
+                                temperature: float = 0.0, beam_size: int = 4,
+                                batch_size: int = 1) -> None:
+        if job.cancel.is_set():
+            self._finish_cancelled(job)
+            return
+        job.status = STATUS_TRANSCRIBING
+        async with self._lock:
+            try:
+                if job.cancel.is_set():
+                    self._finish_cancelled(job)
+                    return
+                tr = await asyncio.to_thread(
+                    self._tr_factory, model_size=self.settings.model_size,
+                    device=self.settings.transcription_device)
+                loop = asyncio.get_running_loop()
+                self._emit(job, {"type": "progress", "phase": "transcribing",
+                                 "stem": "audio", "pct": 0})
+
+                def on_chunk(completed, total):
+                    loop.call_soon_threadsafe(
+                        job.events.put_nowait,
+                        {"type": "progress", "phase": "transcribing",
+                         "stem": "audio", "pct": round(100.0 * completed / total)})
+
+                midi_bytes = await asyncio.to_thread(
+                    tr.transcribe, job.input_path, "audio",
+                    instrument or None, temperature, beam_size,
+                    batch_size, on_chunk)
+                out = job.output_dir / "midi" / f"{job.song_name}.mid"
+                out.write_bytes(midi_bytes)
+                self._emit(job, {"type": "midi", "stem": "full", "file": out.name})
+            except asyncio.CancelledError:
+                self._finish_cancelled(job)
+                return
+            except Exception as exc:
+                if _is_oom(exc):
+                    job.status = STATUS_FAILED
+                    job.error = _OOM_MESSAGE
+                    self._emit(job, {"type": "failed", "message": _OOM_MESSAGE})
+                    return
+                msg = _hf_setup_hint(exc)
+                job.status = STATUS_FAILED
+                job.error = msg
+                self._emit(job, {"type": "failed", "message": msg})
+                return
+        if job.cancel.is_set():
+            self._finish_cancelled(job)
+        else:
+            job.status = STATUS_DONE
+            self._emit(job, {"type": "done"})

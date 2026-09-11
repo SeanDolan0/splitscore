@@ -10,7 +10,7 @@ import zipfile
 from dataclasses import asdict
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -26,6 +26,18 @@ ALLOWED_EXTENSIONS = {"wav", "mp3", "flac", "ogg", "m4a", "aiff"}
 app = FastAPI(title="SplitScore")
 PIPELINE = Pipeline(load_settings())
 
+
+@app.middleware("http")
+async def add_no_cache_header(request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    if path in ("/", "/app.js", "/style.css") or path.endswith((".js", ".css", ".html")):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
+
 _HEARTBEAT = ":" + " " * 15 + "\n\n"  # SSE comment keeps the connection alive
 
 TERMINAL_EVENTS = {"done", "failed", "cancelled"}
@@ -36,7 +48,13 @@ class TranscribeBody(BaseModel):
 
 
 @app.post("/api/jobs")
-async def create_job(file: UploadFile = File(...)):
+async def create_job(
+    file: UploadFile = File(...),
+    mode: str | None = Form(None),
+    instrument: str | None = Form(None),
+    mode_query: str | None = Query(None, alias="mode"),
+    instrument_query: str | None = Query(None, alias="instrument"),
+):
     name = Path(file.filename or "").name  # basename only, strips any ../ or drive segments
     if not name:
         raise HTTPException(400, "Invalid filename")
@@ -53,7 +71,17 @@ async def create_job(file: UploadFile = File(...)):
     in_dir.mkdir(parents=True, exist_ok=True)
     job.input_path = in_dir / name
     job.input_path.write_bytes(data)
-    asyncio.create_task(PIPELINE.separate(job))
+
+    selected_mode = mode or mode_query or "separate"
+    selected_instrument = (instrument or instrument_query or "").strip()
+
+    if selected_mode == "transcribe":
+        s = PIPELINE.settings
+        asyncio.create_task(PIPELINE.transcribe_direct(
+            job, instrument=selected_instrument or None,
+            temperature=s.temperature, beam_size=s.beam_size, batch_size=s.batch_size))
+    else:
+        asyncio.create_task(PIPELINE.separate(job))
     return {"job_id": job.id}
 
 

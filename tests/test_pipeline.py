@@ -165,3 +165,20 @@ async def test_finish_cancelled_discards_output_and_is_idempotent(tmp_path):
     assert _drain(job.events) == [{"type": "cancelled", "message": "Cancelled"}]
     pipe._finish_cancelled(job)  # second call is a no-op
     assert _drain(job.events) == []
+
+
+async def test_transcribe_direct_writes_single_midi(tmp_path):
+    job = Job(id="j1", song_name="my song", input_path=tmp_path / "in.wav",
+              output_dir=tmp_path / "out")
+    (tmp_path / "out" / "midi").mkdir(parents=True)
+    (tmp_path / "in.wav").write_bytes(b"dummy audio")
+    pipe = Pipeline(Settings(), transcriber_factory=FakeTranscriber)
+    await pipe.transcribe_direct(job, instrument="piano",
+                                 temperature=0.0, beam_size=4, batch_size=4)
+    assert job.status == "done"
+    files = sorted(p.name for p in (tmp_path / "out" / "midi").glob("*.mid"))
+    assert files == ["my song.mid"]
+    midi_events = [e for e in _drain(job.events) if e["type"] == "midi"]
+    assert len(midi_events) == 1
+    assert midi_events[0]["file"] == "my song.mid"
+    assert midi_events[0]["stem"] == "full"

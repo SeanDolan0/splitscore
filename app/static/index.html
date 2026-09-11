@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/style.css?v=3">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23161412'/%3E%3Ccircle cx='32' cy='32' r='22' fill='none' stroke='%232b2620' stroke-width='2'/%3E%3Ccircle cx='32' cy='32' r='18' fill='%230c0b09' stroke='%233a332b' stroke-width='1'/%3E%3Ccircle cx='32' cy='32' r='13' fill='none' stroke='%232b2620' stroke-width='0.7'/%3E%3Ccircle cx='32' cy='32' r='9' fill='none' stroke='%232b2620' stroke-width='0.7'/%3E%3Ccircle cx='32' cy='32' r='4' fill='%230c0b09' stroke='%23ffb020' stroke-width='2'/%3E%3Ccircle cx='32' cy='32' r='1.5' fill='%23ffb020'/%3E%3Cpath d='M23 27.5L32 32L23 36.5' fill='%23ffb020'/%3E%3Cpath d='M31 24.5L42 32L31 39.5' fill='%23ffb020' opacity='0.5'/%3E%3C/svg%3E">
 </head>
 <body data-console="idle">
@@ -35,10 +35,10 @@
           <span id="hw-text" class="hw-text mono-label">detecting…</span>
         </div>
       </div>
-      <div class="signal-path mono-label" aria-hidden="true">
-        <span class="sp on">INPUT</span><span class="sp-dash on"></span>
-        <span class="sp on">STEMS</span><span class="sp-dash"></span>
-        <span class="sp">MIDI</span>
+      <div id="signal-path" class="signal-path mono-label" aria-hidden="true">
+        <span id="sp-input" class="sp on">INPUT</span><span id="sp-dash-1" class="sp-dash on"></span>
+        <span id="sp-stems" class="sp on">STEMS</span><span id="sp-dash-2" class="sp-dash"></span>
+        <span id="sp-midi" class="sp">MIDI</span>
       </div>
       <div class="vents" aria-hidden="true"></div>
     </header>
@@ -263,6 +263,66 @@
     <footer class="foot mono-label">LOCAL CONSOLE · ONE JOB AT A TIME</footer>
   </main>
 
-  <script src="/app.js"></script>
+  <!-- action prompt modal (direct body child for top-level overlay) -->
+  <div id="action-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-track-name">
+    <div class="modal-window panel">
+      <span class="screw tl"></span>
+      <span class="screw tr"></span>
+      <div class="modal-header">
+        <div class="mono-label modal-kicker">AUDIO INSERTED · CHOOSE PROCESSING MODE</div>
+        <h2 id="modal-track-name" class="modal-title">Track Name</h2>
+      </div>
+
+      <div class="modal-grid">
+        <!-- Option 1: Stem Separation -->
+        <div class="modal-card">
+          <div class="modal-card-head">
+            <span class="mono-label modal-card-badge">CHANNEL SPLIT</span>
+            <h3 class="modal-card-title">SEPARATE 6 STEMS</h3>
+          </div>
+          <p class="modal-card-desc muted">
+            Split into <strong>bass, drums, other, vocals, guitar, and piano</strong> using BS-RoFormer. Preview each stem and select which channels to transcribe.
+          </p>
+          <button id="btn-action-separate" class="ghost modal-btn" type="button">
+            <span class="btn-glyph"><svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:-1px"><path d="M4 2.5v11l10-5.5z"/></svg></span> SEPARATE STEMS
+          </button>
+        </div>
+
+        <div class="modal-vdivider" aria-hidden="true">
+          <span></span>
+          <em class="mono-label">OR</em>
+          <span></span>
+        </div>
+
+        <!-- Option 2: Direct Transcribe -->
+        <div class="modal-card modal-card-direct">
+          <div class="modal-card-head">
+            <span class="mono-label modal-card-badge modal-badge-direct">DIRECT TRANSCRIPTION</span>
+            <h3 class="modal-card-title">TRANSCRIBE DIRECTLY</h3>
+          </div>
+          <p class="modal-card-desc muted">
+            Skip stem splitting. Transcribe this audio file directly into a single MIDI file with MuScriptor.
+          </p>
+          <div class="modal-inst-field">
+            <label for="direct-inst" class="mono-label modal-inst-label">TARGET INSTRUMENT (OPTIONAL)</label>
+            <span class="inst-wrap">
+              <span class="inst-tag mono-label">INST</span>
+              <input id="direct-inst" class="inst" placeholder="auto (detect instrument)" aria-label="Direct instrument override" autocomplete="off">
+              <div class="inst-dropdown" role="listbox" aria-label="Direct instrument options"></div>
+            </span>
+          </div>
+          <button id="btn-action-transcribe" class="primary modal-btn" type="button">
+            <span class="btn-glyph"><svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:-1px"><path d="M4 2.5v11l10-5.5z"/></svg></span> TRANSCRIBE TO MIDI
+          </button>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="btn-modal-cancel" class="ghost modal-cancel-btn" type="button">CANCEL / CHOOSE DIFFERENT FILE</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js?v=3"></script>
 </body>
 </html>

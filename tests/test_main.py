@@ -34,6 +34,8 @@ class FakePipeline:
         return job
     async def separate(self, job):
         await asyncio.sleep(0)
+    async def transcribe_direct(self, job, instrument=None, temperature=0.0, beam_size=4, batch_size=1):
+        await asyncio.sleep(0)
     def _finish_cancelled(self, job):
         import shutil
         job.status = "cancelled"
@@ -53,6 +55,15 @@ def _make_client(tmp_path, monkeypatch):
 def test_upload_creates_job(tmp_path, monkeypatch):
     client = _make_client(tmp_path, monkeypatch)
     r = client.post("/api/jobs", files={"file": ("song.wav", _make_upload_bytes(), "audio/wav")})
+    assert r.status_code == 200
+    assert r.json()["job_id"] == "abc"
+
+
+def test_upload_with_direct_transcribe_mode(tmp_path, monkeypatch):
+    client = _make_client(tmp_path, monkeypatch)
+    r = client.post("/api/jobs",
+                    data={"mode": "transcribe", "instrument": "piano"},
+                    files={"file": ("song.wav", _make_upload_bytes(), "audio/wav")})
     assert r.status_code == 200
     assert r.json()["job_id"] == "abc"
 
@@ -140,6 +151,10 @@ def test_frontend_marks_stem_checkboxes(tmp_path, monkeypatch):
     for stem in ["vocals", "piano", "guitar", "bass", "drums", "other"]:
         assert f'data-stem="{stem}"' in html
     assert "audio-midi-app" in html
+    assert "action-modal" in html
+    assert "direct-inst" in html
+    assert "btn-action-transcribe" in html
+    assert "btn-action-separate" in html
 
 def test_put_settings_applies_to_running_pipeline(tmp_path, monkeypatch):
     client = _make_client(tmp_path, monkeypatch)

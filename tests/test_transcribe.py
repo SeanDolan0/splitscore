@@ -92,3 +92,17 @@ def test_load_model_uses_fp16_on_cuda():
         Transcriber(device="cuda")
         assert TM.load_model.call_args.kwargs["device"] == "cuda"
         assert TM.load_model.call_args.kwargs["dtype"] == "float16"
+
+def test_resolve_instrument_normalizes_title_case():
+    fake_model = _fake_model()
+    with patch("app.transcribe.TranscriptionModel") as TM, \
+         patch("app.transcribe.list_instruments", return_value=["acoustic_piano", "clean_electric_guitar"]):
+        TM.load_model.return_value = fake_model
+        t = Transcriber(device="cpu")
+        t.transcribe("s.wav", "audio", instruments="Acoustic Piano", batch_size=1)
+        kwargs = fake_model.transcribe.call_args[1]
+        assert kwargs["instruments"] == ["acoustic_piano"]
+
+        t.transcribe("s.wav", "audio", instruments="Clean Electric Guitar", batch_size=1)
+        kwargs = fake_model.transcribe.call_args[1]
+        assert kwargs["instruments"] == ["clean_electric_guitar"]
