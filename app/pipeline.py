@@ -106,9 +106,10 @@ class Pipeline:
                 sep = await asyncio.to_thread(
                     self._sep_factory, precision=self.settings.separation_precision,
                     device=self.settings.separation_device)
+                job._separator_device = getattr(sep, "device", "unknown")
                 await asyncio.to_thread(
                     sep.separate, str(job.input_path), job.output_dir / "stems",
-                    lambda pct: emit({"type": "progress", "phase": "separating", "pct": pct}))
+                    lambda pct: emit({"type": "progress", "phase": "separating", "pct": pct, "device": job._separator_device}))
                 if job.cancel.is_set():
                     self._finish_cancelled(job)
                     return

@@ -15,26 +15,42 @@ async function loadHardware() {
     const badge = $("hw-badge");
     const text = $("hw-text");
     const icon = badge.querySelector(".hw-icon");
-    const sep = hw.separator_device || "unknown";
-    const isCuda = sep === "cuda";
+    const sepActual = hw.separator_actual;
+    const sepConfig = hw.separator_device || hw.settings_device || "auto";
     const gpuName = hw.gpu?.name || "No GPU";
+    const isNvidia = hw.gpu?.vendor === "nvidia";
+    const isApple = hw.gpu?.vendor === "apple";
     const ortProviders = hw.onnxruntime?.providers || [];
-    const ortActive = ortProviders.includes("CUDAExecutionProvider") ? "CUDA" : "CPU";
+    const cudaFunctional = hw.onnxruntime?.cuda_functional ?? (ortProviders.includes("CUDAExecutionProvider") && !!hw.torch?.cuda_available);
 
-    if (isCuda && hw.gpu?.vendor === "nvidia") {
+    badge.className = "hw-badge";
+
+    if (sepActual === "cpu" && (sepConfig === "cuda" || (sepConfig === "auto" && isNvidia))) {
+      icon.innerHTML = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l6.5 3.75v7.5L8 16l-6.5-3.75v-7.5z"/></svg>';
+      badge.classList.add("hw-cpu");
+      text.textContent = `${gpuName} · Fallback to CPU`;
+      badge.title = "CUDA was requested, but CUDA execution failed to initialize. Running on CPU.";
+    } else if (isNvidia && cudaFunctional && (sepConfig === "cuda" || sepConfig === "auto")) {
       icon.innerHTML = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l6.5 3.75v7.5L8 16l-6.5-3.75v-7.5z"/></svg>';
       badge.classList.add("hw-cuda");
-      text.textContent = `${gpuName} · CUDA · ort:${ortActive}`;
-    } else if (hw.gpu?.vendor === "apple") {
+      text.textContent = `${gpuName} · CUDA · ort:CUDA`;
+      badge.title = `torch ${hw.torch?.version || "?"} · onnxruntime ${hw.onnxruntime?.version || "?"}`;
+    } else if (isNvidia && !cudaFunctional) {
+      icon.innerHTML = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l6.5 3.75v7.5L8 16l-6.5-3.75v-7.5z"/></svg>';
+      badge.classList.add("hw-cpu");
+      text.textContent = `${gpuName} (no CUDA libraries) · CPU`;
+      badge.title = `GPU detected, but active Python environment has CPU-only libraries (${hw.torch?.version || "?"}). Run using 'uv run python -m app' to use GPU.`;
+    } else if (isApple) {
       icon.textContent = "";
       badge.classList.add("hw-apple");
-      text.textContent = `Apple Silicon · ort:${ortActive}`;
+      text.textContent = `Apple Silicon · ort:CPU`;
+      badge.title = `torch ${hw.torch?.version || "?"} · onnxruntime ${hw.onnxruntime?.version || "?"}`;
     } else {
       icon.innerHTML = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l6.5 3.75v7.5L8 16l-6.5-3.75v-7.5z"/></svg>';
       badge.classList.add("hw-cpu");
-      text.textContent = `${gpuName} · ort:${ortActive}`;
+      text.textContent = `${gpuName} · CPU`;
+      badge.title = `torch ${hw.torch?.version || "?"} · onnxruntime ${hw.onnxruntime?.version || "?"}`;
     }
-    badge.title = `torch ${hw.torch?.version || "?"} · onnxruntime ${hw.onnxruntime?.version || "?"}`;
   } catch {
     // server not up yet or /api/hardware missing — leave "detecting…" text
   }
@@ -256,6 +272,7 @@ async function saveSettings() {
   });
   settings = await resp.json();
   $("settings-note").textContent = "Settings saved.";
+  loadHardware();
   } finally {
     if (saveBtn) saveBtn.disabled = false;
   }
@@ -302,11 +319,15 @@ function connectEvents(jobId) {
   eventSource.onmessage = (msg) => {
     const ev = JSON.parse(msg.data);
     if (ev.type === "progress") {
-      if (ev.phase === "separating") setProgress(ev.pct, "Separating stems…");
+      if (ev.phase === "separating") {
+        const devLabel = ev.device ? ` (${ev.device.toUpperCase()})` : "";
+        setProgress(ev.pct, `Separating stems${devLabel}…`);
+      }
       if (ev.phase === "transcribing") setProgress(ev.pct, `Transcribing ${ev.stem}…`);
     } else if (ev.type === "stems") {
       setProgress(100, "Separation done");
       showStems();
+      loadHardware();
     } else if (ev.type === "midi") {
       addResult(ev.stem, ev.file);
     } else if (ev.type === "done") {

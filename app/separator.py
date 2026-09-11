@@ -130,21 +130,45 @@ def _download_model(precision: str) -> Path:
         return Path(hf_hub_download(**kw))
 
 
-def _default_session_factory(precision: str, device: str) -> ort.InferenceSession:
+def _add_windows_cuda_dlls() -> None:
     import os, sys
+    if sys.platform != "win32":
+        return
+
+    candidates: list[Path] = []
+    # 1. Current active torch lib
+    try:
+        import torch
+        candidates.append(Path(torch.__file__).parent / "lib")
+    except Exception:
+        pass
+
+    # 2. Virtual environment in project directory (if invoked from system Python)
+    proj_dir = Path(__file__).resolve().parent.parent
+    candidates.append(proj_dir / ".venv" / "Lib" / "site-packages" / "torch" / "lib")
+
+    # 3. System CUDA Toolkit installation if present
+    cuda_path = os.environ.get("CUDA_PATH")
+    if cuda_path:
+        candidates.append(Path(cuda_path) / "bin")
+
+    for p in candidates:
+        if p.is_dir() and any(p.glob("*cublas*")):
+            p_str = str(p.resolve())
+            if p_str not in os.environ.get("PATH", ""):
+                os.environ["PATH"] = p_str + os.pathsep + os.environ.get("PATH", "")
+            if hasattr(os, "add_dll_directory"):
+                try:
+                    os.add_dll_directory(p_str)
+                except OSError:
+                    pass
+
+
+def _default_session_factory(precision: str, device: str) -> ort.InferenceSession:
     from app.gpu import resolve_onnx_provider
 
-    # Windows: onnxruntime-gpu needs CUDA DLLs (cublasLt, cudnn) that ship
-    # inside torch's lib/ dir. Add that to the DLL search path so the
-    # provider can find them without requiring a system CUDA toolkit install.
-    if sys.platform == "win32" and device == "cuda":
-        try:
-            import torch
-            torch_lib = Path(torch.__file__).parent / "lib"
-            if torch_lib.is_dir():
-                os.add_dll_directory(str(torch_lib))
-        except Exception:
-            pass
+    if device == "cuda":
+        _add_windows_cuda_dlls()
 
     model_path = _download_model(precision)
     providers = resolve_onnx_provider(device)
@@ -157,12 +181,10 @@ class Separator:
         from app.settings import resolve_device
         self.device = resolve_device(device)
         factory = session_factory or _default_session_factory
-        import logging, os, warnings
+        import logging, warnings
         log = logging.getLogger(__name__)
-        stderr_fd = os.dup(2)
-        null_fd = os.open(os.devnull, os.O_WRONLY)
+
         try:
-            os.dup2(null_fd, 2)
             self.session = factory(self.precision, self.device)
         except Exception as exc:
             # GPU runtime failed (missing provider, download hiccup) -> CPU.
@@ -171,10 +193,15 @@ class Separator:
             self.session = _default_session_factory(self.precision, "cpu")
             self.device = "cpu"
             warnings.warn(f"GPU provider unavailable ({exc}), running on CPU")
-        finally:
-            os.dup2(stderr_fd, 2)
-            os.close(null_fd)
-            os.close(stderr_fd)
+
+        # Verify actual provider if session supports get_providers()
+        if hasattr(self.session, "get_providers"):
+            actual_providers = self.session.get_providers()
+            if self.device == "cuda" and "CUDAExecutionProvider" not in actual_providers:
+                log.warning("CUDAExecutionProvider requested but failed to load. Active: %s. Using CPU.",
+                            actual_providers)
+                warnings.warn("CUDA requested but unavailable in ONNX Runtime, falling back to CPU")
+                self.device = "cpu"
 
     def _run_chunk(self, spec_chunk: torch.Tensor):
         """[2,1025,345] complex -> ([6,2,1025,345] real, [6,2,1025,345] imag) as tensors.

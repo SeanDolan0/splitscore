@@ -128,6 +128,7 @@ async def get_hardware():
     import importlib
     info = {"torch": None, "onnxruntime": None, "gpu": None,
             "settings_device": PIPELINE.settings.separation_device,
+            "separator_device": PIPELINE.settings.separation_device,
             "separator_actual": None}
 
     # torch
@@ -146,19 +147,41 @@ async def get_hardware():
     # onnxruntime
     try:
         ort = importlib.import_module("onnxruntime")
+        providers = ort.get_available_providers()
+        from app.separator import _add_windows_cuda_dlls
+        _add_windows_cuda_dlls()
+
+        cuda_functional = False
+        if "CUDAExecutionProvider" in providers:
+            if info["torch"] and info["torch"].get("cuda_available"):
+                cuda_functional = True
+            else:
+                import os
+                from pathlib import Path
+                for p in os.environ.get("PATH", "").split(os.pathsep):
+                    if p:
+                        try:
+                            p_path = Path(p)
+                            if p_path.is_dir() and any(p_path.glob("*cublas*")):
+                                cuda_functional = True
+                                break
+                        except Exception:
+                            pass
+
         info["onnxruntime"] = {
             "version": ort.__version__,
-            "providers": ort.get_available_providers(),
+            "providers": providers,
+            "cuda_functional": cuda_functional,
         }
     except Exception:
-        info["onnxruntime"] = {"version": "not installed", "providers": []}
+        info["onnxruntime"] = {"version": "not installed", "providers": [], "cuda_functional": False}
 
     # gpu detection (runtime)
     gpu = detect_gpu()
     info["gpu"] = {"vendor": gpu.vendor, "name": gpu.name, "preferred_device": gpu.preferred_device}
 
-    # actual device used by the separator (if any job has run)
-    for job in PIPELINE.jobs.values():
+    # actual device used by the separator (from the latest completed/active job)
+    for job in reversed(list(PIPELINE.jobs.values())):
         if hasattr(job, "_separator_device"):
             info["separator_actual"] = job._separator_device
             break

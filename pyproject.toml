@@ -1,6 +1,6 @@
 [project]
 name = "splitscore"
-version = "0.1.3"
+version = "0.1.4"
 description = "Separate audio into stems with BS-RoFormer-SW, then transcribe to MIDI with MuScriptor"
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
@@ -47,6 +47,7 @@ pythonpath = ["."]
 # For dev, run `uv run python sync.py` which detects GPU and installs torch into the venv.
 # Environments restriction prevents muscriptor's macOS torch conflict from breaking resolution.
 [tool.uv]
+system-certs = true
 environments = [
     "sys_platform == 'win32'",
     "sys_platform == 'linux'",
