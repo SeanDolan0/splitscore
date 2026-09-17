@@ -194,13 +194,14 @@ class Separator:
             self.device = "cpu"
             warnings.warn(f"GPU provider unavailable ({exc}), running on CPU")
 
-        # Verify actual provider if session supports get_providers()
+        # Verify actual provider if session supports get_providers(). CUDA may be
+        # missing here even though we requested it (e.g. a broken provider that
+        # the DLL pre-check in resolve_onnx_provider couldn't predict) — reflect
+        # the real device quietly rather than warning, since it's already handled.
         if hasattr(self.session, "get_providers"):
             actual_providers = self.session.get_providers()
             if self.device == "cuda" and "CUDAExecutionProvider" not in actual_providers:
-                log.warning("CUDAExecutionProvider requested but failed to load. Active: %s. Using CPU.",
-                            actual_providers)
-                warnings.warn("CUDA requested but unavailable in ONNX Runtime, falling back to CPU")
+                log.debug("ONNX Runtime active providers: %s", actual_providers)
                 self.device = "cpu"
 
     def _run_chunk(self, spec_chunk: torch.Tensor):

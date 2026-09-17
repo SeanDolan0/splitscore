@@ -1,10 +1,13 @@
 """GPU detection and backend resolution for onnxruntime and torch."""
 from __future__ import annotations
 
+import os
 import platform
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -87,8 +90,54 @@ _PROVIDER_MAP: dict[str, list[str]] = {
 }
 
 
+def _dll_search_dirs() -> list[str]:
+    """Directory roots where onnxruntime provider DLLs may be found."""
+    dirs: list[str] = []
+    seen: set[str] = set()
+    roots = list(os.environ.get("PATH", "").split(os.pathsep))
+    cuda_path = os.environ.get("CUDA_PATH", "")
+    if cuda_path:
+        roots.append(cuda_path)
+    for root in roots:
+        for candidate in (root, os.path.join(root, "bin")):
+            if candidate and os.path.isdir(candidate):
+                key = os.path.abspath(candidate)
+                if key not in seen:
+                    seen.add(key)
+                    dirs.append(key)
+    try:
+        import torch
+        lib = Path(torch.__file__).parent / "lib"
+        if lib.is_dir():
+            key = str(lib)
+            if key not in seen:
+                dirs.append(key)
+    except Exception:
+        pass
+    return dirs
+
+
+def _has_cudnn_dll() -> bool:
+    """True if the onnxruntime CUDA provider's cuDNN dependency is present.
+
+    onnxruntime-gpu <1.27 on Windows loads CUDAExecutionProvider at session
+    creation, which hard-fails with a noisy native error when cudnn64_9.dll is
+    missing (e.g. a CPU-only torch wheel provides none). Detect that up front
+    and drop CUDA entirely so we fall back to CPU cleanly instead.
+    """
+    if sys.platform != "win32":
+        return True  # other platforms: let session creation validate
+    for name in ("cudnn64_9.dll", "cudnn64_8.dll"):
+        for d in _dll_search_dirs():
+            if os.path.exists(os.path.join(d, name)):
+                return True
+    return False
+
+
 def resolve_onnx_provider(device: str) -> list[str]:
     """Return ordered list of onnxruntime providers for the given device."""
+    if device == "cuda" and not _has_cudnn_dll():
+        return ["CPUExecutionProvider"]
     return _PROVIDER_MAP.get(device, ["CPUExecutionProvider"])
 
 
